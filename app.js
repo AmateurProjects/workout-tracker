@@ -454,9 +454,11 @@
           const visibleH = rowH * 0.5 + gap + rowH + gap + stepperH + gap + rowH * 0.5;
           container.style.maxHeight = visibleH + 'px';
           container.style.overflowY = 'auto';
-          // Scroll so active row is centered in the visible window
-          const scrollTarget = Math.max(0, activeRow.offsetTop - (rowH * 0.5 + gap));
-          container.scrollTo({ top: scrollTarget, behavior: 'smooth' });
+          // Wait for layout to settle, then scroll
+          requestAnimationFrame(() => {
+            const scrollTarget = Math.max(0, activeRow.offsetTop - (rowH * 0.5 + gap));
+            container.scrollTo({ top: scrollTarget, behavior: 'smooth' });
+          });
         }
       });
     } else {

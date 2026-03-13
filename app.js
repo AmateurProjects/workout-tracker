@@ -4,7 +4,6 @@
 
   // ===== Configuration =====
   const STORAGE_KEY = 'workout_tracker_data';
-  const SETS_PER_EXERCISE = 3;
   const VOLUME_WINDOW_DAYS = 14;
 
   // ===== Exercise Definitions =====
@@ -14,10 +13,10 @@
       icon: '🔙',
       target: 15,
       exercises: [
-        { id: 'pullup', name: 'Pull Up / Pull Down', icon: '💪', sets: 3, dots: 4 },
-        { id: 'row', name: 'Row', icon: '🚣', sets: 3, dots: 4 },
-        { id: 'upperback', name: 'Upper Back', icon: '🔝', sets: 3, dots: 4 },
-        { id: 'back_misc', name: 'Misc', icon: '➕', sets: 3, dots: 4 },
+        { id: 'pullup', name: 'Pull Up / Pull Down', icon: '💪', dots: 4 },
+        { id: 'row', name: 'Row', icon: '🚣', dots: 4 },
+        { id: 'upperback', name: 'Upper Back', icon: '🔝', dots: 4 },
+        { id: 'back_misc', name: 'Misc', icon: '➕', dots: 4 },
       ],
     },
     shoulders: {
@@ -25,10 +24,10 @@
       icon: '🏋️',
       target: 15,
       exercises: [
-        { id: 'lateral_raise', name: 'Lateral Raise', icon: '🤸', sets: 3, dots: 4 },
-        { id: 'overhead_press', name: 'Overhead Press', icon: '⬆️', sets: 3, dots: 4 },
-        { id: 'rear_delt', name: 'Rear Delt', icon: '🔄', sets: 3, dots: 4 },
-        { id: 'shoulders_misc', name: 'Misc', icon: '➕', sets: 3, dots: 4 },
+        { id: 'lateral_raise', name: 'Lateral Raise', icon: '🤸', dots: 4 },
+        { id: 'overhead_press', name: 'Overhead Press', icon: '⬆️', dots: 4 },
+        { id: 'rear_delt', name: 'Rear Delt', icon: '🔄', dots: 4 },
+        { id: 'shoulders_misc', name: 'Misc', icon: '➕', dots: 4 },
       ],
     },
     chest: {
@@ -36,9 +35,9 @@
       icon: '🫁',
       target: 15,
       exercises: [
-        { id: 'chest_press', name: 'Press', icon: '🏋️', sets: 3, dots: 4 },
-        { id: 'flys', name: 'Flys', icon: '🦅', sets: 3, dots: 4 },
-        { id: 'chest_misc', name: 'Misc', icon: '➕', sets: 3, dots: 4 },
+        { id: 'chest_press', name: 'Press', icon: '🏋️', dots: 4 },
+        { id: 'flys', name: 'Flys', icon: '🦅', dots: 4 },
+        { id: 'chest_misc', name: 'Misc', icon: '➕', dots: 4 },
       ],
     },
     legs: {
@@ -46,13 +45,13 @@
       icon: '🦵',
       target: 18,
       exercises: [
-        { id: 'leg_press', name: 'Leg Press', icon: '🦿', sets: 3, dots: 4 },
-        { id: 'leg_extension', name: 'Leg Extension', icon: '🦵', sets: 3, dots: 4 },
-        { id: 'leg_curl', name: 'Leg Curl', icon: '🔄', sets: 3, dots: 4 },
-        { id: 'calf_raise', name: 'Calf Raise', icon: '🦶', sets: 3, dots: 4 },
-        { id: 'rdl', name: 'RDL', icon: '🏋️', sets: 3, dots: 4 },
-        { id: 'squats', name: 'Squats', icon: '⬇️', sets: 3, dots: 4 },
-        { id: 'legs_misc', name: 'Misc', icon: '➕', sets: 3, dots: 4 },
+        { id: 'leg_press', name: 'Leg Press', icon: '🦿', dots: 4 },
+        { id: 'leg_extension', name: 'Leg Extension', icon: '🦵', dots: 4 },
+        { id: 'leg_curl', name: 'Leg Curl', icon: '🔄', dots: 4 },
+        { id: 'calf_raise', name: 'Calf Raise', icon: '🦶', dots: 4 },
+        { id: 'rdl', name: 'RDL', icon: '🏋️', dots: 4 },
+        { id: 'squats', name: 'Squats', icon: '⬇️', dots: 4 },
+        { id: 'legs_misc', name: 'Misc', icon: '➕', dots: 4 },
       ],
     },
     arms: {
@@ -60,10 +59,10 @@
       icon: '💪',
       target: 18,
       exercises: [
-        { id: 'bicep_curls', name: 'Bicep Curls', icon: '💪', sets: 3, dots: 4 },
-        { id: 'forearms', name: 'Forearms', icon: '🤜', sets: 3, dots: 4 },
-        { id: 'triceps', name: 'Triceps', icon: '🔻', sets: 3, dots: 4 },
-        { id: 'arms_misc', name: 'Misc', icon: '➕', sets: 3, dots: 4 },
+        { id: 'bicep_curls', name: 'Bicep Curls', icon: '💪', dots: 4 },
+        { id: 'forearms', name: 'Forearms', icon: '🤜', dots: 4 },
+        { id: 'triceps', name: 'Triceps', icon: '🔻', dots: 4 },
+        { id: 'arms_misc', name: 'Misc', icon: '➕', dots: 4 },
       ],
     },
     cardio: {
@@ -71,22 +70,32 @@
       icon: '🏃',
       target: 6,
       exercises: [
-        { id: 'run', name: 'Run', icon: '🏃', sets: 1, dots: 1 },
-        { id: 'stairs', name: 'Stairs', icon: '🪜', sets: 1, dots: 1 },
-        { id: 'rowing', name: 'Rowing', icon: '🚣', sets: 1, dots: 1 },
-        { id: 'sports', name: 'Sports', icon: '⚽', sets: 1, dots: 1 },
-        { id: 'walking', name: 'Walking', icon: '🚶', sets: 1, dots: 1 },
+        { id: 'run', name: 'Run', icon: '🏃', dots: 1 },
+        { id: 'stairs', name: 'Stairs', icon: '🪜', dots: 1 },
+        { id: 'rowing', name: 'Rowing', icon: '🚣', dots: 1 },
+        { id: 'sports', name: 'Sports', icon: '⚽', dots: 1 },
+        { id: 'walking', name: 'Walking', icon: '🚶', dots: 1 },
       ],
     },
   };
 
   // ===== State =====
+  // Precompute exercise → group lookup
+  const EXERCISE_GROUP_MAP = {};
+  for (const [key, group] of Object.entries(MUSCLE_GROUPS)) {
+    for (const ex of group.exercises) {
+      EXERCISE_GROUP_MAP[ex.id] = key;
+    }
+  }
+
   let data = loadData();
-  let activeGroup = 'back';
+  let activeGroup = null;
   let undoTimeout = null;
   let lastAction = null;
   let pushWindow = null; // { exerciseId, ts, timer }
-  let dailyCelebrated = false;
+  let cardioCelebrated = false;
+  let exerciseCelebrated = false;
+  const _sanitizeEl = document.createElement('div');
 
   // ===== Persistence =====
   function loadData() {
@@ -156,11 +165,6 @@
     return (data.logs[exerciseId] || []).sort((a, b) => b.date.localeCompare(a.date));
   }
 
-  function getTodaySetsCount(exerciseId) {
-    const today = todayStr();
-    return (data.logs[exerciseId] || []).filter(l => l.date === today).length;
-  }
-
   function getTodayLogs(exerciseId) {
     const today = todayStr();
     return (data.logs[exerciseId] || []).filter(l => l.date === today);
@@ -196,54 +200,35 @@
     return logs.length > 0 ? logs[0].date : null;
   }
 
-  function getLastSessionCount(exerciseId) {
-    const lastDate = getLastDate(exerciseId);
-    if (!lastDate) return 0;
-    return (data.logs[exerciseId] || []).filter(l => l.date === lastDate).length;
-  }
-
-  function getRecentDates(exerciseId) {
-    const logs = getExerciseLogs(exerciseId);
-    const unique = [...new Set(logs.map(l => l.date))];
-    return unique.slice(0, 5);
-  }
-
   function getGroupVolume14Days(groupKey) {
-    const group = MUSCLE_GROUPS[groupKey];
-    const today = todayStr();
-    let total = 0;
-    for (const ex of group.exercises) {
-      const logs = data.logs[ex.id] || [];
-      total += logs.filter(l => daysBetween(l.date, today) <= VOLUME_WINDOW_DAYS).length;
-    }
+    const { total } = getGroupStats14Days(groupKey);
     return total;
   }
 
-  function getGroupPushVolume14Days(groupKey) {
+  function getGroupStats14Days(groupKey) {
     const group = MUSCLE_GROUPS[groupKey];
     const today = todayStr();
     let total = 0;
+    let pushed = 0;
     for (const ex of group.exercises) {
       const logs = data.logs[ex.id] || [];
-      total += logs.filter(l => daysBetween(l.date, today) <= VOLUME_WINDOW_DAYS && l.push).length;
+      for (const l of logs) {
+        if (daysBetween(l.date, today) <= VOLUME_WINDOW_DAYS) {
+          total++;
+          if (l.push) pushed++;
+        }
+      }
     }
-    return total;
+    return { total, pushed };
   }
 
-  function getGroupForExercise(exerciseId) {
-    for (const [key, group] of Object.entries(MUSCLE_GROUPS)) {
-      if (group.exercises.some(ex => ex.id === exerciseId)) return key;
-    }
-    return null;
-  }
-
-  function getDailyExerciseCount() {
+  function getDailySetCount() {
     const today = todayStr();
     const cardioIds = new Set(MUSCLE_GROUPS.cardio.exercises.map(e => e.id));
     let count = 0;
     for (const [id, logs] of Object.entries(data.logs)) {
       if (cardioIds.has(id)) continue;
-      if (logs.some(l => l.date === today)) count++;
+      count += logs.filter(l => l.date === today).length;
     }
     return count;
   }
@@ -263,10 +248,10 @@
     if (!data.logs[exerciseId]) data.logs[exerciseId] = [];
 
     // Snapshot before logging
-    const groupKey = getGroupForExercise(exerciseId);
+    const groupKey = EXERCISE_GROUP_MAP[exerciseId] || null;
     const volBefore = groupKey ? getGroupVolume14Days(groupKey) : 0;
     const target = groupKey ? getTarget(groupKey) : 0;
-    const dailyBefore = getDailyExerciseCount();
+    const dailyBefore = getDailySetCount();
     const cardioBefore = getDailyCardioCount();
 
     const entry = { date: todayStr(), ts: Date.now() };
@@ -275,21 +260,17 @@
 
     // Snapshot after logging
     const volAfter = groupKey ? getGroupVolume14Days(groupKey) : 0;
-    const dailyAfter = getDailyExerciseCount();
+    const dailyAfter = getDailySetCount();
     const cardioAfter = getDailyCardioCount();
 
-    // Check daily workout completion (5 non-cardio exercises or 1 cardio)
-    if (!dailyCelebrated) {
-      const isCardio = MUSCLE_GROUPS.cardio.exercises.some(e => e.id === exerciseId);
-      if (isCardio && cardioBefore < 1 && cardioAfter >= 1) {
-        dailyCelebrated = true;
-        celebrateDaily();
-      } else if (!isCardio && dailyBefore < 5 && dailyAfter >= 5) {
-        dailyCelebrated = true;
-        celebrateDaily();
-      } else if (target > 0 && volBefore < target && volAfter >= target) {
-        celebrate(MUSCLE_GROUPS[groupKey].label + ' Goal Reached!');
-      }
+    // Check daily workout completion (15 total sets or 1 cardio)
+    const isCardio = MUSCLE_GROUPS.cardio.exercises.some(e => e.id === exerciseId);
+    if (isCardio && !cardioCelebrated && cardioBefore < 1 && cardioAfter >= 1) {
+      cardioCelebrated = true;
+      celebrateDaily();
+    } else if (!isCardio && !exerciseCelebrated && dailyBefore < 15 && dailyAfter >= 15) {
+      exerciseCelebrated = true;
+      celebrateDaily();
     } else if (target > 0 && volBefore < target && volAfter >= target) {
       celebrate(MUSCLE_GROUPS[groupKey].label + ' Goal Reached!');
     }
@@ -300,34 +281,6 @@
 
     lastAction = { exerciseId, entry };
     showUndo(exerciseId);
-    renderAll();
-  }
-
-  function undoLast() {
-    if (!lastAction) return;
-    const { exerciseId, entry } = lastAction;
-    const logs = data.logs[exerciseId];
-    if (logs) {
-      const idx = logs.findIndex(l => l.ts === entry.ts);
-      if (idx !== -1) {
-        logs.splice(idx, 1);
-        saveData();
-      }
-    }
-    lastAction = null;
-    hideUndo();
-    renderAll();
-  }
-
-  function deleteLog(exerciseId, ts) {
-    const logs = data.logs[exerciseId];
-    if (logs) {
-      const idx = logs.findIndex(l => l.ts === ts);
-      if (idx !== -1) {
-        logs.splice(idx, 1);
-        saveData();
-      }
-    }
     renderAll();
   }
 
@@ -417,8 +370,7 @@
     for (const key of groupKeys) {
       const group = MUSCLE_GROUPS[key];
       const target = getTarget(key);
-      const vol = getGroupVolume14Days(key);
-      const pushVol = getGroupPushVolume14Days(key);
+      const { total: vol, pushed: pushVol } = getGroupStats14Days(key);
       const pct = target > 0 ? Math.min((vol / target) * 100, 100) : 0;
       const pushPct = target > 0 ? Math.min((pushVol / target) * 100, 100) : 0;
 
@@ -474,8 +426,8 @@
 
     let idx = 0;
     for (const ex of group.exercises) {
-      const todaySets = getTodaySetsCount(ex.id);
       const todayLogs = getTodayLogs(ex.id);
+      const todaySets = todayLogs.length;
       const lastDate = getLastDate(ex.id);
       const ago = lastDate ? daysAgo(lastDate) : null;
 
@@ -797,9 +749,8 @@
 
   // ===== Security: Sanitize =====
   function sanitize(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+    _sanitizeEl.textContent = str;
+    return _sanitizeEl.innerHTML;
   }
 
   // ===== Tab Navigation =====
@@ -875,7 +826,6 @@
   // ===== Init =====
   function init() {
     seedIfEmpty();
-    activeGroup = null;
     initModal();
     renderDate();
     renderSummary();

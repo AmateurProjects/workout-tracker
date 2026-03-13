@@ -26,7 +26,6 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   e.respondWith(
     caches.match(e.request).then((cached) => {
-      // Serve from cache, update in background
       const fetchPromise = fetch(e.request).then((response) => {
         if (response && response.status === 200 && response.type === 'basic') {
           const clone = response.clone();

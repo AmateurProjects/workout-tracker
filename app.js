@@ -147,10 +147,7 @@
   function daysAgoLabel(n) {
     if (n === 0) return 'Today';
     if (n === 1) return 'Yesterday';
-    if (n < 7) return `${n}d ago`;
-    if (n < 30) return `${Math.floor(n / 7)}w ago`;
-    if (n < 365) return `${Math.floor(n / 30)}mo ago`;
-    return `${Math.floor(n / 365)}y ago`;
+    return `${n} days ago`;
   }
 
   function freshnessClass(n) {

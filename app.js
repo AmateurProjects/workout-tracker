@@ -287,50 +287,30 @@
         <span class="summary-label">${group.label}</span>
         <div class="summary-bar-track">
           <div class="summary-bar-fill group-${key}" style="width:${pct}%"></div>
-          <span class="summary-bar-value">
-            ${vol} / <span class="summary-target" data-group="${key}">${target}</span>
-          </span>
+          <span class="summary-bar-value">${vol} / ${target}</span>
+        </div>
+        <div class="target-stepper">
+          <button class="target-btn" data-dir="-1" aria-label="Decrease target">&minus;</button>
+          <button class="target-btn" data-dir="1" aria-label="Increase target">&plus;</button>
         </div>
       `;
       row.addEventListener('click', (e) => {
-        if (e.target.closest('.summary-target') || e.target.closest('.target-input')) return;
+        if (e.target.closest('.target-btn')) return;
         switchToGroup(key);
       });
 
-      // Tap target number to edit
-      row.querySelector('.summary-target').addEventListener('click', (e) => {
-        e.stopPropagation();
-        startEditTarget(e.target, key);
+      row.querySelectorAll('.target-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const dir = parseInt(btn.dataset.dir, 10);
+          const newTarget = Math.max(1, getTarget(key) + dir);
+          setTarget(key, newTarget);
+          renderSummary();
+        });
       });
 
       container.appendChild(row);
     }
-  }
-
-  function startEditTarget(el, groupKey) {
-    const current = getTarget(groupKey);
-    const input = document.createElement('input');
-    input.type = 'number';
-    input.className = 'target-input';
-    input.value = current;
-    input.min = 1;
-    input.max = 999;
-    el.replaceWith(input);
-    input.focus();
-    input.select();
-
-    function commit() {
-      const val = parseInt(input.value, 10);
-      if (val > 0 && val <= 999) {
-        setTarget(groupKey, val);
-      }
-      renderSummary();
-    }
-
-    input.addEventListener('blur', commit);
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { input.blur(); }
-    });
   }
 
   function renderExercises() {
@@ -477,10 +457,8 @@
     bar.className = 'undo-bar';
     bar.id = 'undo-bar';
     bar.innerHTML = `
-      <span>Logged exercise</span>
-      <button class="undo-btn">UNDO</button>
+      <span>Tap dots to undo</span>
     `;
-    bar.querySelector('.undo-btn').addEventListener('click', undoLast);
     document.getElementById('app').appendChild(bar);
 
     undoTimeout = setTimeout(hideUndo, 5000);

@@ -154,6 +154,7 @@
     if (n === 0) return 'freshness-today';
     if (n === 1) return 'freshness-yesterday';
     if (n <= 12) return 'freshness-recent';
+    if (n <= 14) return 'freshness-expiring';
     return 'freshness-stale';
   }
 
@@ -207,8 +208,8 @@
     const today = todayStr();
     let total = 0;
     let pushed = 0;
-    // Freshness buckets: today(0), yesterday(1), recent(2-13)
-    const buckets = { today: 0, yesterday: 0, recent: 0 };
+    // Freshness buckets: today(0), yesterday(1), recent(2-12), expiring(13-14)
+    const buckets = { today: 0, yesterday: 0, recent: 0, expiring: 0 };
     for (const ex of group.exercises) {
       const logs = data.logs[ex.id] || [];
       for (const l of logs) {
@@ -218,7 +219,8 @@
           if (l.push) pushed++;
           if (ago === 0) buckets.today++;
           else if (ago === 1) buckets.yesterday++;
-          else buckets.recent++;
+          else if (ago <= 12) buckets.recent++;
+          else buckets.expiring++;
         }
       }
     }
@@ -378,6 +380,7 @@
 
       // Build segmented bar fills ordered: recent, yesterday, today
       const segments = [
+        { count: buckets.expiring, color: '#f87171' },
         { count: buckets.recent, color: '#fbbf24' },
         { count: buckets.yesterday, color: '#22c55e' },
         { count: buckets.today, color: '#4ade80' },

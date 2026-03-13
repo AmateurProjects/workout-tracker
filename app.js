@@ -86,6 +86,7 @@
   let undoTimeout = null;
   let lastAction = null;
   let pushWindow = null; // { exerciseId, ts, timer }
+  let dailyCelebrated = false;
 
   // ===== Persistence =====
   function loadData() {
@@ -277,11 +278,18 @@
     const dailyAfter = getDailyExerciseCount();
     const cardioAfter = getDailyCardioCount();
 
-    // Check daily workout completion (5 exercises or 1 cardio)
-    const wasComplete = dailyBefore >= 5 || cardioBefore >= 1;
-    const isComplete = dailyAfter >= 5 || cardioAfter >= 1;
-    if (!wasComplete && isComplete) {
-      celebrateDaily();
+    // Check daily workout completion (5 non-cardio exercises or 1 cardio)
+    if (!dailyCelebrated) {
+      const isCardio = MUSCLE_GROUPS.cardio.exercises.some(e => e.id === exerciseId);
+      if (isCardio && cardioBefore < 1 && cardioAfter >= 1) {
+        dailyCelebrated = true;
+        celebrateDaily();
+      } else if (!isCardio && dailyBefore < 5 && dailyAfter >= 5) {
+        dailyCelebrated = true;
+        celebrateDaily();
+      } else if (target > 0 && volBefore < target && volAfter >= target) {
+        celebrate(MUSCLE_GROUPS[groupKey].label + ' Goal Reached!');
+      }
     } else if (target > 0 && volBefore < target && volAfter >= target) {
       celebrate(MUSCLE_GROUPS[groupKey].label + ' Goal Reached!');
     }
@@ -796,14 +804,17 @@
 
   // ===== Tab Navigation =====
   function switchToGroup(groupKey) {
+    const card = document.getElementById('summary');
     if (activeGroup === groupKey) {
       // Toggle off
       collapseExercises();
       activeGroup = null;
+      card.classList.remove('card-compact');
       renderSummary();
       return;
     }
     activeGroup = groupKey;
+    card.classList.add('card-compact');
     renderExercises();
     renderSummary();
   }
@@ -875,6 +886,7 @@
       if (activeGroup) {
         collapseExercises();
         activeGroup = null;
+        document.getElementById('summary').classList.remove('card-compact');
         renderSummary();
       }
     });

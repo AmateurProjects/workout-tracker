@@ -114,9 +114,16 @@ body {
 #summary-bars {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0;
+  overflow: hidden;
   touch-action: none;
   overscroll-behavior: none;
+}
+
+.summary-bars-track {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .summary-row {

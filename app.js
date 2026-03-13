@@ -94,8 +94,9 @@
     } catch (e) {
       console.error('Failed to load data', e);
     }
-    return { logs: {} };
+    return { logs: {}, targets: {} };
     // logs: { [exerciseId]: [ { date: "YYYY-MM-DD" }, ... ] }
+    // targets: { [groupKey]: number }
   }
 
   function saveData() {
@@ -226,6 +227,20 @@
     renderAll();
   }
 
+  function removeLastTodaySet(exerciseId) {
+    const today = todayStr();
+    const logs = data.logs[exerciseId] || [];
+    for (let i = logs.length - 1; i >= 0; i--) {
+      if (logs[i].date === today) {
+        logs.splice(i, 1);
+        saveData();
+        renderAll();
+        showToast('-1 set');
+        return;
+      }
+    }
+  }
+
   // ===== Rendering =====
   function renderAll() {
     renderDate();
@@ -241,34 +256,81 @@
     });
   }
 
+  function getTarget(groupKey) {
+    if (data.targets && data.targets[groupKey] != null) return data.targets[groupKey];
+    return MUSCLE_GROUPS[groupKey].target;
+  }
+
+  function setTarget(groupKey, value) {
+    if (!data.targets) data.targets = {};
+    data.targets[groupKey] = value;
+    saveData();
+  }
+
   function renderSummary() {
     const container = document.getElementById('summary-bars');
     container.innerHTML = '';
 
     const groupKeys = Object.keys(MUSCLE_GROUPS);
-    let maxTarget = 0;
-    for (const key of groupKeys) {
-      maxTarget = Math.max(maxTarget, MUSCLE_GROUPS[key].target);
-    }
 
     for (const key of groupKeys) {
       const group = MUSCLE_GROUPS[key];
+      const target = getTarget(key);
       const vol = getGroupVolume14Days(key);
-      const pct = Math.min((vol / group.target) * 100, 100);
+      const pct = target > 0 ? Math.min((vol / target) * 100, 100) : 0;
 
       const row = document.createElement('div');
       row.className = 'summary-row';
       row.dataset.group = key;
+      if (key === activeGroup) row.classList.add('active');
       row.innerHTML = `
         <span class="summary-label">${group.label}</span>
         <div class="summary-bar-track">
           <div class="summary-bar-fill group-${key}" style="width:${pct}%"></div>
-          <span class="summary-bar-value">${vol} / ${group.target}</span>
+          <span class="summary-bar-value">
+            ${vol} / <span class="summary-target" data-group="${key}">${target}</span>
+          </span>
         </div>
       `;
-      row.addEventListener('click', () => switchToGroup(key));
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.summary-target') || e.target.closest('.target-input')) return;
+        switchToGroup(key);
+      });
+
+      // Tap target number to edit
+      row.querySelector('.summary-target').addEventListener('click', (e) => {
+        e.stopPropagation();
+        startEditTarget(e.target, key);
+      });
+
       container.appendChild(row);
     }
+  }
+
+  function startEditTarget(el, groupKey) {
+    const current = getTarget(groupKey);
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.className = 'target-input';
+    input.value = current;
+    input.min = 1;
+    input.max = 999;
+    el.replaceWith(input);
+    input.focus();
+    input.select();
+
+    function commit() {
+      const val = parseInt(input.value, 10);
+      if (val > 0 && val <= 999) {
+        setTarget(groupKey, val);
+      }
+      renderSummary();
+    }
+
+    input.addEventListener('blur', commit);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { input.blur(); }
+    });
   }
 
   function renderExercises() {
@@ -316,8 +378,17 @@
       // Tap on card body to log 1 set
       card.addEventListener('click', (e) => {
         if (e.target.closest('.exercise-more')) return;
+        if (e.target.closest('.exercise-sets')) return;
         logExercise(ex.id);
         showToast(`+1 set ${sanitize(ex.name)}`);
+      });
+
+      // Tap dots to remove last today's set
+      card.querySelector('.exercise-sets').addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (todaySets > 0) {
+          removeLastTodaySet(ex.id);
+        }
       });
 
       // Tap ⋯ for history
@@ -430,24 +501,11 @@
 
   // ===== Tab Navigation =====
   function switchToGroup(groupKey) {
-    const tabButtons = document.querySelectorAll('.tab');
-    tabButtons.forEach(b => b.classList.remove('active'));
-    const target = document.querySelector(`.tab[data-group="${groupKey}"]`);
-    if (target) {
-      target.classList.add('active');
-      target.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-    }
     activeGroup = groupKey;
     renderExercises();
-  }
-
-  function initTabs() {
-    const tabButtons = document.querySelectorAll('.tab');
-    tabButtons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        switchToGroup(btn.dataset.group);
-      });
-    });
+    // Scroll exercises into view
+    const el = document.getElementById('exercises');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   // ===== Modal Close =====
@@ -495,7 +553,6 @@
   // ===== Init =====
   function init() {
     seedIfEmpty();
-    initTabs();
     initModal();
     renderAll();
   }

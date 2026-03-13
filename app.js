@@ -207,19 +207,18 @@
     const today = todayStr();
     let total = 0;
     let pushed = 0;
-    // Freshness buckets: today(0), yesterday(1), recent(2-12), stale(13+)
-    const buckets = { today: 0, yesterday: 0, recent: 0, stale: 0 };
+    // Freshness buckets: today(0), yesterday(1), recent(2-13)
+    const buckets = { today: 0, yesterday: 0, recent: 0 };
     for (const ex of group.exercises) {
       const logs = data.logs[ex.id] || [];
       for (const l of logs) {
         const ago = daysBetween(l.date, today);
-        if (ago < VOLUME_WINDOW_DAYS) {
+        if (ago <= VOLUME_WINDOW_DAYS) {
           total++;
           if (l.push) pushed++;
           if (ago === 0) buckets.today++;
           else if (ago === 1) buckets.yesterday++;
-          else if (ago <= 12) buckets.recent++;
-          else buckets.stale++;
+          else buckets.recent++;
         }
       }
     }
@@ -383,7 +382,6 @@
 
       // Build segmented bar fills ordered: today, yesterday, recent, stale
       const segments = [
-        { count: buckets.stale, color: '#f87171' },
         { count: buckets.recent, color: '#fbbf24' },
         { count: buckets.yesterday, color: '#22c55e' },
         { count: buckets.today, color: '#4ade80' },
@@ -483,8 +481,8 @@
 
       const card = document.createElement('div');
       card.className = `exercise-card group-${activeGroup}`;
-      const fc = lastDate ? freshnessClass(ago) : 'freshness-stale';
-      card.classList.add(fc);
+      const withinWindow = lastDate && ago < VOLUME_WINDOW_DAYS;
+      if (withinWindow) card.classList.add(freshnessClass(ago));
 
       // Build set dots — each dot = 1 set today, pushed sets get gold
       const dotCount = ex.dots;
@@ -500,10 +498,8 @@
 
       // Build meta
       let metaHtml = '';
-      if (lastDate) {
+      if (withinWindow) {
         metaHtml = `<span class="${freshnessClass(ago)}">${daysAgoLabel(ago)}</span>`;
-      } else {
-        metaHtml = `<span class="freshness-stale">Never</span>`;
       }
 
       // Check if push window is active for this exercise

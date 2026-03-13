@@ -368,10 +368,6 @@
     const container = document.getElementById('summary-bars');
     container.innerHTML = '';
 
-    // Inner wrapper for reliable transform-based positioning
-    const track = document.createElement('div');
-    track.className = 'summary-bars-track';
-
     const groupKeys = Object.keys(MUSCLE_GROUPS);
 
     for (const key of groupKeys) {
@@ -380,7 +376,7 @@
       const { total: vol, pushed: pushVol, buckets } = getGroupStats14Days(key);
       const pushPct = target > 0 ? Math.min((pushVol / target) * 100, 100) : 0;
 
-      // Build segmented bar fills ordered: today, yesterday, recent, stale
+      // Build segmented bar fills ordered: recent, yesterday, today
       const segments = [
         { count: buckets.recent, color: '#fbbf24' },
         { count: buckets.yesterday, color: '#22c55e' },
@@ -411,7 +407,6 @@
       `;
       row.addEventListener('click', (e) => {
         if (e.target.closest('.target-btn')) return;
-        // Any tap on any row (active or faded) toggles back to full view
         if (activeGroup) {
           switchToGroup(activeGroup); // toggles off
         } else {
@@ -419,7 +414,7 @@
         }
       });
 
-      track.appendChild(row);
+      container.appendChild(row);
 
       // Add stepper row below active bar
       if (key === activeGroup) {
@@ -439,29 +434,8 @@
             renderSummary();
           });
         });
-        track.appendChild(stepperRow);
+        container.appendChild(stepperRow);
       }
-    }
-
-    container.appendChild(track);
-
-    // Clip outer container + translate inner track to center the active row
-    if (activeGroup) {
-      const activeRow = track.querySelector('.summary-row.active');
-      const stepper = track.querySelector('.target-stepper-row');
-      if (activeRow) {
-        const rowH = activeRow.offsetHeight;
-        const stepperH = stepper ? stepper.offsetHeight : 0;
-        const gap = 10;
-        const visibleH = rowH * 0.5 + gap + rowH + gap + stepperH + gap + rowH * 0.5;
-        const shift = Math.max(0, activeRow.offsetTop - (rowH * 0.5 + gap));
-        container.style.maxHeight = visibleH + 'px';
-        container.style.overflow = 'hidden';
-        track.style.transform = `translateY(-${shift}px)`;
-      }
-    } else {
-      container.style.maxHeight = '';
-      container.style.overflow = '';
     }
   }
 

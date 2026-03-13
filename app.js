@@ -85,6 +85,7 @@
   let activeGroup = 'back';
   let undoTimeout = null;
   let lastAction = null;
+  let pushWindow = null; // { exerciseId, ts, timer }
 
   // ===== Persistence =====
   function loadData() {
@@ -159,6 +160,36 @@
     return (data.logs[exerciseId] || []).filter(l => l.date === today).length;
   }
 
+  function getTodayLogs(exerciseId) {
+    const today = todayStr();
+    return (data.logs[exerciseId] || []).filter(l => l.date === today);
+  }
+
+  function getPushStats(exerciseId) {
+    const today = todayStr();
+    const logs = data.logs[exerciseId] || [];
+    // Group by date, only last 30 days
+    const byDate = {};
+    for (const l of logs) {
+      if (daysBetween(l.date, today) <= 30) {
+        if (!byDate[l.date]) byDate[l.date] = [];
+        byDate[l.date].push(l);
+      }
+    }
+    const dates = Object.keys(byDate).sort().reverse();
+    let pushSessions = 0;
+    let totalSessions = dates.length;
+    let streak = 0;
+    let streakBroken = false;
+    for (const date of dates) {
+      const hasPush = byDate[date].some(l => l.push);
+      if (hasPush) pushSessions++;
+      if (!streakBroken && hasPush) streak++;
+      else streakBroken = true;
+    }
+    return { pushSessions, totalSessions, streak };
+  }
+
   function getLastDate(exerciseId) {
     const logs = getExerciseLogs(exerciseId);
     return logs.length > 0 ? logs[0].date : null;
@@ -213,6 +244,10 @@
       celebrate(MUSCLE_GROUPS[groupKey].label);
     }
 
+    // Open push window
+    if (pushWindow) clearTimeout(pushWindow.timer);
+    pushWindow = { exerciseId, ts: entry.ts, timer: setTimeout(clearPushWindow, 3000) };
+
     lastAction = { exerciseId, entry };
     showUndo(exerciseId);
     renderAll();
@@ -258,6 +293,39 @@
         return;
       }
     }
+  }
+
+  function markLastSetAsPush(exerciseId) {
+    if (!pushWindow || pushWindow.exerciseId !== exerciseId) return;
+    const logs = data.logs[exerciseId] || [];
+    const entry = logs.find(l => l.ts === pushWindow.ts);
+    if (entry) {
+      entry.push = true;
+      saveData();
+    }
+    clearTimeout(pushWindow.timer);
+    pushWindow = null;
+    renderAll();
+    const ex = findExercise(exerciseId);
+    showToast(`+1 🔥 set ${ex ? sanitize(ex.name) : ''}`);
+  }
+
+  function clearPushWindow() {
+    if (!pushWindow) return;
+    clearTimeout(pushWindow.timer);
+    pushWindow = null;
+    // Re-render to hide the push icon
+    skipAnimation = true;
+    renderExercises();
+    skipAnimation = false;
+  }
+
+  function findExercise(exerciseId) {
+    for (const group of Object.values(MUSCLE_GROUPS)) {
+      const ex = group.exercises.find(e => e.id === exerciseId);
+      if (ex) return ex;
+    }
+    return null;
   }
 
   // ===== Rendering =====
@@ -346,6 +414,7 @@
     let idx = 0;
     for (const ex of group.exercises) {
       const todaySets = getTodaySetsCount(ex.id);
+      const todayLogs = getTodayLogs(ex.id);
       const lastDate = getLastDate(ex.id);
       const ago = lastDate ? daysAgo(lastDate) : null;
 
@@ -354,11 +423,16 @@
       const fc = lastDate ? freshnessClass(ago) : 'freshness-stale';
       card.classList.add(fc);
 
-      // Build set dots — each dot = 1 set today, resets daily
+      // Build set dots — each dot = 1 set today, pushed sets get gold
       const dotCount = ex.dots;
       let dotsHtml = '';
       for (let i = 0; i < dotCount; i++) {
-        dotsHtml += `<span class="set-dot ${i < todaySets ? 'filled' : ''}"></span>`;
+        if (i < todaySets) {
+          const isPushed = todayLogs[i] && todayLogs[i].push;
+          dotsHtml += `<span class="set-dot filled${isPushed ? ' pushed' : ''}"></span>`;
+        } else {
+          dotsHtml += `<span class="set-dot"></span>`;
+        }
       }
 
       // Build meta
@@ -368,6 +442,14 @@
       } else {
         metaHtml = `<span class="freshness-stale">Never</span>`;
       }
+      // Push stats
+      const ps = getPushStats(ex.id);
+      if (ps.pushSessions > 0) {
+        metaHtml += `<span class="push-stat">🔥 ${ps.pushSessions}/${ps.totalSessions}</span>`;
+      }
+
+      // Check if push window is active for this exercise
+      const hasPushWindow = pushWindow && pushWindow.exerciseId === ex.id;
 
       card.innerHTML = `
         <div class="exercise-icon">${ex.icon}</div>
@@ -376,6 +458,7 @@
           <div class="exercise-meta">${metaHtml}</div>
         </div>
         <div class="exercise-sets">${dotsHtml}</div>
+        <button class="push-icon${hasPushWindow ? ' push-icon-active' : ''}" data-exercise="${ex.id}" aria-label="Mark as pushed">🔥</button>
         <button class="exercise-more" data-exercise="${ex.id}" aria-label="History">⋯</button>
       `;
 
@@ -383,8 +466,15 @@
       card.addEventListener('click', (e) => {
         if (e.target.closest('.exercise-more')) return;
         if (e.target.closest('.exercise-sets')) return;
+        if (e.target.closest('.push-icon')) return;
         logExercise(ex.id);
         showToast(`+1 set ${sanitize(ex.name)}`);
+      });
+
+      // Tap push icon to mark as pushed
+      card.querySelector('.push-icon').addEventListener('click', (e) => {
+        e.stopPropagation();
+        markLastSetAsPush(ex.id);
       });
 
       // Tap dots to remove last today's set
@@ -533,8 +623,19 @@
       }
 
       let html = '';
+
+      // Push streak banner
+      const ps = getPushStats(exercise.id);
+      if (ps.streak > 1) {
+        html += `<div class="push-streak-banner">🔥 Pushed ${ps.streak} sessions in a row</div>`;
+      }
+
       for (const [date, entries] of Object.entries(byDate)) {
         const ago = daysAgo(date);
+        const pushCount = entries.filter(e => e.push).length;
+        const setsLabel = pushCount > 0
+          ? `${entries.length} sets (${pushCount} 🔥)`
+          : `${entries.length} sets`;
         html += `
           <div class="history-entry">
             <div>
@@ -542,7 +643,7 @@
               <div class="history-ago ${freshnessClass(ago)}">${daysAgoLabel(ago)}</div>
             </div>
             <div style="text-align:right">
-              <div style="font-weight:600">${entries.length} sets</div>
+              <div style="font-weight:600">${setsLabel}</div>
             </div>
           </div>
         `;

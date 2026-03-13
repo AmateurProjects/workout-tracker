@@ -216,7 +216,7 @@
       const logs = data.logs[ex.id] || [];
       for (const l of logs) {
         const ago = daysBetween(l.date, today);
-        if (ago <= VOLUME_WINDOW_DAYS) {
+        if (ago < VOLUME_WINDOW_DAYS) {
           total++;
           if (l.push) pushed++;
           if (ago === 0) buckets.today++;
@@ -382,10 +382,10 @@
 
       // Build segmented bar fills ordered: today, yesterday, recent, stale
       const segments = [
-        { count: buckets.today, color: '#4ade80' },
-        { count: buckets.yesterday, color: '#22c55e' },
-        { count: buckets.recent, color: '#fbbf24' },
         { count: buckets.stale, color: '#f87171' },
+        { count: buckets.recent, color: '#fbbf24' },
+        { count: buckets.yesterday, color: '#22c55e' },
+        { count: buckets.today, color: '#4ade80' },
       ];
       let segmentsHtml = '';
       let leftPct = 0;
@@ -457,10 +457,12 @@
           const visibleH = rowH * 0.5 + gap + rowH + gap + stepperH + gap + rowH * 0.5;
           container.style.maxHeight = visibleH + 'px';
           container.style.overflow = 'hidden';
-          // Scroll so active row is centered in the window
+          // Shift content so active row is centered in the window
           const rowTop = activeRow.offsetTop;
-          const scrollTarget = rowTop - (rowH * 0.5 + gap);
-          container.scrollTop = Math.max(0, scrollTarget);
+          const scrollTarget = Math.max(0, rowTop - (rowH * 0.5 + gap));
+          for (const child of container.children) {
+            child.style.transform = `translateY(-${scrollTarget}px)`;
+          }
         }
       });
     } else {

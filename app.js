@@ -415,28 +415,6 @@
         container.appendChild(stepperRow);
       }
     }
-
-    // When compact, shift container so active row is centered in the clipped area
-    if (activeGroup) {
-      requestAnimationFrame(() => {
-        const activeRow = container.querySelector('.summary-row.active');
-        if (activeRow) {
-          const containerRect = container.getBoundingClientRect();
-          const rowRect = activeRow.getBoundingClientRect();
-          const maxH = 120;
-          // Current row offset relative to container top (without any transform)
-          const rowTop = activeRow.offsetTop;
-          const rowMid = rowTop + rowRect.height / 2;
-          const shift = Math.max(0, rowMid - maxH / 2);
-          // Don't shift so far that bottom is empty
-          const totalH = container.scrollHeight;
-          const maxShift = Math.max(0, totalH - maxH);
-          container.style.transform = `translateY(-${Math.min(shift, maxShift)}px)`;
-        }
-      });
-    } else {
-      container.style.transform = '';
-    }
   }
 
   function renderExercises() {
@@ -809,45 +787,8 @@
     document.querySelector('.modal-backdrop').addEventListener('click', closeModal);
   }
 
-  // ===== Import Seed Data From Spreadsheet =====
-  function seedIfEmpty() {
-    // Only seed if no data exists
-    if (Object.keys(data.logs).length > 0) return;
-
-    // Seed historical data from the spreadsheet attachment
-    const seedData = {
-      pullup: ['2025-09-13', '2025-10-02', '2026-01-06', '2026-03-02', '2026-03-12'],
-      row: ['2025-01-29', '2026-01-06', '2026-03-02', '2026-03-12'],
-      upperback: ['2026-01-20', '2026-01-25'],
-      lateral_raise: ['2025-02-10', '2025-12-21', '2026-02-02', '2026-02-28'],
-      overhead_press: ['2025-01-29', '2025-02-09', '2026-02-02', '2026-02-28'],
-      rear_delt: ['2024-08-10', '2025-09-23', '2025-12-01', '2026-02-28'],
-      chest_press: ['2025-11-24', '2026-01-03', '2026-02-23', '2026-03-02'],
-      flys: ['2024-12-18', '2025-11-24', '2026-02-23', '2026-03-02'],
-      chest_misc: ['2024-06-24'],
-      leg_press: ['2025-11-18', '2026-02-28', '2026-03-02'],
-      leg_extension: ['2025-04-26', '2025-05-04', '2025-07-19', '2025-12-01'],
-      leg_curl: ['2025-05-04', '2025-08-22', '2025-12-01', '2026-03-12'],
-      calf_raise: ['2024-07-03', '2024-07-12', '2026-01-25'],
-      rdl: ['2026-01-17', '2026-01-25'],
-      squats: ['2026-01-17', '2026-01-25'],
-      bicep_curls: ['2026-02-28', '2026-03-02', '2026-03-12', '2026-03-12'],
-      forearms: ['2025-01-30', '2025-06-06', '2026-01-16'],
-      triceps: ['2024-09-26', '2025-06-06', '2026-01-24', '2026-02-28'],
-      arms_misc: ['2025-01-22', '2025-01-23'],
-      run: ['2026-01-24', '2026-02-23', '2026-02-27', '2026-03-01', '2026-03-07'],
-    };
-
-    for (const [exerciseId, dates] of Object.entries(seedData)) {
-      data.logs[exerciseId] = dates.map(date => ({ date, ts: parseDate(date).getTime() }));
-    }
-
-    saveData();
-  }
-
   // ===== Init =====
   function init() {
-    seedIfEmpty();
     initModal();
     renderDate();
     renderSummary();
@@ -862,6 +803,170 @@
         renderSummary();
       }
     });
+
+    // Settings gear
+    document.getElementById('settings-btn').addEventListener('click', openSettings);
+  }
+
+  // ===== Settings / Import / Export =====
+  function openSettings() {
+    const modal = document.getElementById('modal');
+    const title = document.getElementById('modal-title');
+    const body = document.getElementById('modal-body');
+
+    title.textContent = 'Settings';
+
+    const totalLogs = Object.values(data.logs).reduce((sum, arr) => sum + arr.length, 0);
+
+    body.innerHTML = `
+      <div class="settings-section">
+        <p style="color:var(--text-dim);font-size:0.85rem;margin-bottom:16px;">${totalLogs} total sets logged</p>
+        <button class="btn btn-primary settings-action" id="edit-history-btn">Edit History</button>
+        <button class="btn btn-primary settings-action" id="export-btn">Export Data</button>
+        <button class="btn btn-danger settings-action" id="clear-all-btn">Clear All Data</button>
+      </div>
+    `;
+
+    document.getElementById('edit-history-btn').addEventListener('click', () => {
+      openHistoryEditor();
+    });
+    document.getElementById('export-btn').addEventListener('click', exportData);
+    document.getElementById('clear-all-btn').addEventListener('click', () => {
+      if (confirm('Delete ALL workout data? This cannot be undone.')) {
+        data = { logs: {}, targets: {} };
+        saveData();
+        closeModal();
+        renderAll();
+        showToast('All data cleared');
+      }
+    });
+
+    modal.classList.remove('hidden');
+  }
+
+  function exportData() {
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'workout-data-' + todayStr() + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Data exported');
+  }
+
+  // ===== History Editor =====
+  function openHistoryEditor(selectedGroup) {
+    const modal = document.getElementById('modal');
+    const title = document.getElementById('modal-title');
+    const body = document.getElementById('modal-body');
+
+    title.textContent = 'Edit History';
+
+    // Build 14 days (today + 13 prior)
+    const days = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      days.push({
+        date: `${y}-${m}-${day}`,
+        label: d.toLocaleDateString('en-US', { weekday: 'narrow' }),
+        num: d.getDate()
+      });
+    }
+
+    // Group selector tabs
+    const groupKeys = Object.keys(MUSCLE_GROUPS);
+    const currentGroup = selectedGroup || groupKeys[0];
+
+    let tabsHtml = '<div class="history-tabs">';
+    for (const key of groupKeys) {
+      const g = MUSCLE_GROUPS[key];
+      tabsHtml += `<button class="history-tab${key === currentGroup ? ' active' : ''}" data-group="${key}">${g.label}</button>`;
+    }
+    tabsHtml += '</div>';
+
+    // Day header row
+    let headerHtml = '<div class="history-grid-row history-grid-header"><div class="history-grid-name"></div>';
+    for (const day of days) {
+      headerHtml += `<div class="history-grid-day"><span>${day.label}</span><span>${day.num}</span></div>`;
+    }
+    headerHtml += '</div>';
+
+    // Exercise rows for current group
+    const exercises = MUSCLE_GROUPS[currentGroup].exercises;
+    let rowsHtml = '';
+    for (const ex of exercises) {
+      rowsHtml += `<div class="history-grid-row"><div class="history-grid-name">${sanitize(ex.name)}</div>`;
+      for (const day of days) {
+        const logs = (data.logs[ex.id] || []).filter(l => l.date === day.date);
+        const count = logs.length;
+        const maxDots = ex.dots;
+        rowsHtml += `<div class="history-grid-cell" data-exercise="${ex.id}" data-date="${day.date}" data-count="${count}" data-max="${maxDots}">`;
+        rowsHtml += `<span class="history-cell-num${count > 0 ? ' has-sets' : ''}">${count || ''}</span>`;
+        rowsHtml += '</div>';
+      }
+      rowsHtml += '</div>';
+    }
+
+    body.innerHTML = `
+      ${tabsHtml}
+      <div class="history-grid-scroll">
+        ${headerHtml}
+        ${rowsHtml}
+      </div>
+      <div style="margin-top:12px;text-align:center;">
+        <button class="btn btn-primary" id="history-done-btn" style="flex:none;padding:10px 32px;">Done</button>
+      </div>
+    `;
+
+    // Tab switching
+    body.querySelectorAll('.history-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        openHistoryEditor(tab.dataset.group);
+      });
+    });
+
+    // Cell tapping
+    body.querySelectorAll('.history-grid-cell').forEach(cell => {
+      cell.addEventListener('click', () => {
+        const exId = cell.dataset.exercise;
+        const date = cell.dataset.date;
+        const max = parseInt(cell.dataset.max, 10);
+        let current = parseInt(cell.dataset.count, 10);
+
+        if (current >= max) {
+          // Remove all logs for this exercise on this date
+          if (data.logs[exId]) {
+            data.logs[exId] = data.logs[exId].filter(l => l.date !== date);
+          }
+          current = 0;
+        } else {
+          // Add one log
+          if (!data.logs[exId]) data.logs[exId] = [];
+          data.logs[exId].push({ date, ts: parseDate(date).getTime() + data.logs[exId].filter(l => l.date === date).length });
+          current++;
+        }
+
+        saveData();
+        cell.dataset.count = current;
+        const numEl = cell.querySelector('.history-cell-num');
+        numEl.textContent = current || '';
+        numEl.classList.toggle('has-sets', current > 0);
+      });
+    });
+
+    // Done button
+    document.getElementById('history-done-btn').addEventListener('click', () => {
+      closeModal();
+      renderAll();
+    });
+
+    modal.classList.remove('hidden');
   }
 
   if (document.readyState === 'loading') {

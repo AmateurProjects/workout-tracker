@@ -443,27 +443,24 @@
 
     // Clip and smooth-scroll to center active row
     if (activeGroup) {
-      requestAnimationFrame(() => {
-        const activeRow = container.querySelector('.summary-row.active');
-        const stepper = container.querySelector('.target-stepper-row');
-        if (activeRow) {
-          const rowH = activeRow.offsetHeight;
-          const stepperH = stepper ? stepper.offsetHeight : 0;
-          const gap = 10; // matches #summary-bars gap
-          // Visible window: half-row + gap + active row + gap + stepper + gap + half-row
-          const visibleH = rowH * 0.5 + gap + rowH + gap + stepperH + gap + rowH * 0.5;
-          container.style.maxHeight = visibleH + 'px';
-          container.style.overflowY = 'auto';
-          // Wait for layout to settle, then scroll
-          requestAnimationFrame(() => {
-            const scrollTarget = Math.max(0, activeRow.offsetTop - (rowH * 0.5 + gap));
-            container.scrollTo({ top: scrollTarget, behavior: 'smooth' });
-          });
-        }
-      });
+      // Measure before clipping
+      const activeRow = container.querySelector('.summary-row.active');
+      const stepper = container.querySelector('.target-stepper-row');
+      if (activeRow) {
+        const rowH = activeRow.offsetHeight;
+        const stepperH = stepper ? stepper.offsetHeight : 0;
+        const gap = 10; // matches #summary-bars gap
+        const visibleH = rowH * 0.5 + gap + rowH + gap + stepperH + gap + rowH * 0.5;
+        const scrollTarget = Math.max(0, activeRow.offsetTop - (rowH * 0.5 + gap));
+        // Apply clip and position in one step
+        container.style.maxHeight = visibleH + 'px';
+        container.style.overflow = 'hidden';
+        container.scrollTop = scrollTarget;
+      }
     } else {
       container.style.maxHeight = '';
-      container.style.overflowY = '';
+      container.style.overflow = '';
+      container.scrollTop = 0;
     }
   }
 

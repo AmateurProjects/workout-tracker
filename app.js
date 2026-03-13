@@ -444,7 +444,7 @@
       }
     }
 
-    // Clip and scroll to center active row
+    // Clip and smooth-scroll to center active row
     if (activeGroup) {
       requestAnimationFrame(() => {
         const activeRow = container.querySelector('.summary-row.active');
@@ -456,18 +456,15 @@
           // Visible window: half-row + gap + active row + gap + stepper + gap + half-row
           const visibleH = rowH * 0.5 + gap + rowH + gap + stepperH + gap + rowH * 0.5;
           container.style.maxHeight = visibleH + 'px';
-          container.style.overflow = 'hidden';
-          // Shift content so active row is centered in the window
-          const rowTop = activeRow.offsetTop;
-          const scrollTarget = Math.max(0, rowTop - (rowH * 0.5 + gap));
-          for (const child of container.children) {
-            child.style.transform = `translateY(-${scrollTarget}px)`;
-          }
+          container.style.overflowY = 'auto';
+          // Scroll so active row is centered in the visible window
+          const scrollTarget = Math.max(0, activeRow.offsetTop - (rowH * 0.5 + gap));
+          container.scrollTo({ top: scrollTarget, behavior: 'smooth' });
         }
       });
     } else {
       container.style.maxHeight = '';
-      container.style.overflow = '';
+      container.style.overflowY = '';
     }
   }
 
@@ -857,6 +854,9 @@
         renderSummary();
       }
     });
+
+    // Block user-initiated scrolling on summary bars (wheel + touch)
+    document.getElementById('summary-bars').addEventListener('wheel', (e) => { e.preventDefault(); }, { passive: false });
 
     // Settings gear
     document.getElementById('settings-btn').addEventListener('click', openSettings);

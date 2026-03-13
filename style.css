@@ -115,7 +115,14 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  transition: max-height 0.35s ease;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  touch-action: none;
+  overscroll-behavior: none;
 }
+
+#summary-bars::-webkit-scrollbar { display: none; }
 
 .summary-row {
   display: flex;

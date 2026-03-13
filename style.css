@@ -93,8 +93,20 @@ body {
   -webkit-tap-highlight-color: transparent;
   border-radius: 8px;
   padding: 8px 10px;
-  transition: background 0.15s, box-shadow 0.15s;
+  transition: background 0.15s, box-shadow 0.15s, opacity 0.3s ease, max-height 0.3s ease, padding 0.3s ease, margin 0.3s ease;
   border: 2px solid transparent;
+  max-height: 60px;
+  overflow: hidden;
+}
+
+.summary-row.collapsed {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin: 0;
+  border-color: transparent;
+  pointer-events: none;
 }
 
 .summary-row:active {
@@ -137,6 +149,17 @@ body {
   min-width: 2px;
 }
 
+.summary-bar-push {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  border-radius: 8px;
+  transition: width 0.4s ease;
+  opacity: 0.45;
+  filter: brightness(1.8) saturate(0.6);
+}
+
 .summary-bar-value {
   position: absolute;
   right: 10px;
@@ -147,17 +170,26 @@ body {
   color: var(--text);
 }
 
-.target-stepper {
+.target-stepper-row {
   display: flex;
   align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
-  visibility: hidden;
-  width: 58px;
+  justify-content: center;
+  gap: 12px;
+  padding: 4px 0 2px;
+  animation: fadeSlideIn 0.25s ease;
 }
 
-.summary-row.active .target-stepper {
-  visibility: visible;
+.target-value {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text);
+  min-width: 28px;
+  text-align: center;
+}
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .target-btn {
@@ -165,7 +197,7 @@ body {
   height: 28px;
   border: none;
   border-radius: 50%;
-  background: var(--surface2);
+  background: rgba(108, 99, 255, 0.25);
   color: var(--text);
   font-size: 1rem;
   font-weight: 700;
@@ -502,6 +534,13 @@ body {
 .summary-bar-fill.group-arms { background: #ce82ff; }
 .summary-bar-fill.group-cardio { background: #ffea64; }
 
+.summary-bar-push.group-back { background: #fff; }
+.summary-bar-push.group-shoulders { background: #fff; }
+.summary-bar-push.group-chest { background: #fff; }
+.summary-bar-push.group-legs { background: #fff; }
+.summary-bar-push.group-arms { background: #fff; }
+.summary-bar-push.group-cardio { background: #fff; }
+
 /* ===== Undo bar ===== */
 .undo-bar {
   position: fixed;
@@ -636,4 +675,29 @@ body {
   color: #ff9f43;
   font-weight: 600;
   font-size: 0.85rem;
+}
+
+/* ===== Starburst (Daily Workout) ===== */
+.starburst {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  opacity: 0;
+  pointer-events: none;
+  animation: starburstOut ease-out forwards;
+  z-index: 1;
+}
+
+@keyframes starburstOut {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translate(0, 0) scale(0.3) rotate(0deg);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(var(--tx), var(--ty)) scale(1.2) rotate(360deg);
+  }
 }

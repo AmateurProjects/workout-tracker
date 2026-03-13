@@ -218,6 +218,17 @@
     return total;
   }
 
+  function getGroupPushVolume14Days(groupKey) {
+    const group = MUSCLE_GROUPS[groupKey];
+    const today = todayStr();
+    let total = 0;
+    for (const ex of group.exercises) {
+      const logs = data.logs[ex.id] || [];
+      total += logs.filter(l => daysBetween(l.date, today) <= VOLUME_WINDOW_DAYS && l.push).length;
+    }
+    return total;
+  }
+
   function getGroupForExercise(exerciseId) {
     for (const [key, group] of Object.entries(MUSCLE_GROUPS)) {
       if (group.exercises.some(ex => ex.id === exerciseId)) return key;
@@ -225,23 +236,52 @@
     return null;
   }
 
+  function getDailyExerciseCount() {
+    const today = todayStr();
+    const ids = new Set();
+    for (const [id, logs] of Object.entries(data.logs)) {
+      if (logs.some(l => l.date === today)) ids.add(id);
+    }
+    return ids.size;
+  }
+
+  function getDailyCardioCount() {
+    const today = todayStr();
+    const cardioIds = MUSCLE_GROUPS.cardio.exercises.map(e => e.id);
+    let count = 0;
+    for (const id of cardioIds) {
+      if ((data.logs[id] || []).some(l => l.date === today)) count++;
+    }
+    return count;
+  }
+
   // ===== Actions =====
   function logExercise(exerciseId) {
     if (!data.logs[exerciseId]) data.logs[exerciseId] = [];
 
-    // Check volume before
+    // Snapshot before logging
     const groupKey = getGroupForExercise(exerciseId);
     const volBefore = groupKey ? getGroupVolume14Days(groupKey) : 0;
     const target = groupKey ? getTarget(groupKey) : 0;
+    const dailyBefore = getDailyExerciseCount();
+    const cardioBefore = getDailyCardioCount();
 
     const entry = { date: todayStr(), ts: Date.now() };
     data.logs[exerciseId].push(entry);
     saveData();
 
-    // Check if goal just reached
+    // Snapshot after logging
     const volAfter = groupKey ? getGroupVolume14Days(groupKey) : 0;
-    if (target > 0 && volBefore < target && volAfter >= target) {
-      celebrate(MUSCLE_GROUPS[groupKey].label);
+    const dailyAfter = getDailyExerciseCount();
+    const cardioAfter = getDailyCardioCount();
+
+    // Check daily workout completion (5 exercises or 1 cardio)
+    const wasComplete = dailyBefore >= 5 || cardioBefore >= 1;
+    const isComplete = dailyAfter >= 5 || cardioAfter >= 1;
+    if (!wasComplete && isComplete) {
+      celebrateDaily();
+    } else if (target > 0 && volBefore < target && volAfter >= target) {
+      celebrate(MUSCLE_GROUPS[groupKey].label + ' Goal Reached!');
     }
 
     // Open push window
@@ -368,21 +408,21 @@
       const group = MUSCLE_GROUPS[key];
       const target = getTarget(key);
       const vol = getGroupVolume14Days(key);
+      const pushVol = getGroupPushVolume14Days(key);
       const pct = target > 0 ? Math.min((vol / target) * 100, 100) : 0;
+      const pushPct = target > 0 ? Math.min((pushVol / target) * 100, 100) : 0;
 
       const row = document.createElement('div');
       row.className = 'summary-row';
       row.dataset.group = key;
       if (key === activeGroup) row.classList.add('active');
+      if (activeGroup && key !== activeGroup) row.classList.add('collapsed');
       row.innerHTML = `
         <span class="summary-label">${group.label}</span>
         <div class="summary-bar-track">
           <div class="summary-bar-fill group-${key}" style="width:${pct}%"></div>
+          ${pushVol > 0 ? `<div class="summary-bar-push group-${key}" style="width:${pushPct}%"></div>` : ''}
           <span class="summary-bar-value">${vol} / ${target}</span>
-        </div>
-        <div class="target-stepper">
-          <button class="target-btn" data-dir="-1" aria-label="Decrease target">&minus;</button>
-          <button class="target-btn" data-dir="1" aria-label="Increase target">&plus;</button>
         </div>
       `;
       row.addEventListener('click', (e) => {
@@ -390,17 +430,28 @@
         switchToGroup(key);
       });
 
-      row.querySelectorAll('.target-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const dir = parseInt(btn.dataset.dir, 10);
-          const newTarget = Math.max(1, getTarget(key) + dir);
-          setTarget(key, newTarget);
-          renderSummary();
-        });
-      });
-
       container.appendChild(row);
+
+      // Add stepper row below active bar
+      if (key === activeGroup) {
+        const stepperRow = document.createElement('div');
+        stepperRow.className = 'target-stepper-row';
+        stepperRow.innerHTML = `
+          <button class="target-btn" data-dir="-1" aria-label="Decrease target">&minus;</button>
+          <span class="target-value">${target}</span>
+          <button class="target-btn" data-dir="1" aria-label="Increase target">&plus;</button>
+        `;
+        stepperRow.querySelectorAll('.target-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const dir = parseInt(btn.dataset.dir, 10);
+            const newTarget = Math.max(1, getTarget(key) + dir);
+            setTarget(key, newTarget);
+            renderSummary();
+          });
+        });
+        container.appendChild(stepperRow);
+      }
     }
   }
 
@@ -441,11 +492,6 @@
         metaHtml = `<span class="${freshnessClass(ago)}">${daysAgoLabel(ago)}</span>`;
       } else {
         metaHtml = `<span class="freshness-stale">Never</span>`;
-      }
-      // Push stats
-      const ps = getPushStats(ex.id);
-      if (ps.pushSessions > 0) {
-        metaHtml += `<span class="push-stat">🔥 ${ps.pushSessions}/${ps.totalSessions}</span>`;
       }
 
       // Check if push window is active for this exercise
@@ -570,14 +616,14 @@
   }
 
   // ===== Celebration =====
-  function celebrate(groupLabel) {
+  function celebrate(message) {
     const overlay = document.createElement('div');
     overlay.className = 'celebrate-overlay';
 
     // Banner text
     const banner = document.createElement('div');
     banner.className = 'celebrate-banner';
-    banner.textContent = `${groupLabel} Goal Reached!`;
+    banner.textContent = message;
     overlay.appendChild(banner);
 
     // Confetti particles
@@ -601,6 +647,42 @@
       overlay.classList.add('celebrate-fade');
       setTimeout(() => overlay.remove(), 500);
     }, 2200);
+  }
+
+  function celebrateDaily() {
+    const overlay = document.createElement('div');
+    overlay.className = 'celebrate-overlay';
+
+    // Banner
+    const banner = document.createElement('div');
+    banner.className = 'celebrate-banner';
+    banner.textContent = 'Workout Complete! \ud83d\udcaa';
+    overlay.appendChild(banner);
+
+    // Starburst particles — explode outward from center
+    const emojis = ['\u2b50', '\ud83d\udcaa', '\ud83d\udd25', '\u26a1', '\ud83c\udf1f', '\ud83c\udfc6', '\ud83d\ude80', '\ud83c\udf89'];
+    for (let i = 0; i < 40; i++) {
+      const p = document.createElement('div');
+      p.className = 'starburst';
+      p.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+      const angle = (Math.PI * 2 * i) / 40 + (Math.random() - 0.5) * 0.3;
+      const dist = 120 + Math.random() * 200;
+      const tx = Math.cos(angle) * dist;
+      const ty = Math.sin(angle) * dist;
+      p.style.setProperty('--tx', tx + 'px');
+      p.style.setProperty('--ty', ty + 'px');
+      p.style.animationDelay = Math.random() * 0.3 + 's';
+      p.style.animationDuration = (0.8 + Math.random() * 0.6) + 's';
+      p.style.fontSize = (16 + Math.random() * 16) + 'px';
+      overlay.appendChild(p);
+    }
+
+    document.getElementById('app').appendChild(overlay);
+
+    setTimeout(() => {
+      overlay.classList.add('celebrate-fade');
+      setTimeout(() => overlay.remove(), 500);
+    }, 2500);
   }
 
   // ===== History Modal =====

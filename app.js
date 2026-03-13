@@ -14,10 +14,10 @@
       icon: '🔙',
       target: 15,
       exercises: [
-        { id: 'pullup', name: 'Pull Up / Pull Down', icon: '💪', sets: 3 },
-        { id: 'row', name: 'Row', icon: '🚣', sets: 3 },
-        { id: 'upperback', name: 'Upper Back', icon: '🔝', sets: 3 },
-        { id: 'back_misc', name: 'Misc', icon: '➕', sets: 3 },
+        { id: 'pullup', name: 'Pull Up / Pull Down', icon: '💪', sets: 3, dots: 4 },
+        { id: 'row', name: 'Row', icon: '🚣', sets: 3, dots: 4 },
+        { id: 'upperback', name: 'Upper Back', icon: '🔝', sets: 3, dots: 4 },
+        { id: 'back_misc', name: 'Misc', icon: '➕', sets: 3, dots: 4 },
       ],
     },
     shoulders: {
@@ -25,10 +25,10 @@
       icon: '🏋️',
       target: 15,
       exercises: [
-        { id: 'lateral_raise', name: 'Lateral Raise', icon: '🤸', sets: 3 },
-        { id: 'overhead_press', name: 'Overhead Press', icon: '⬆️', sets: 3 },
-        { id: 'rear_delt', name: 'Rear Delt', icon: '🔄', sets: 3 },
-        { id: 'shoulders_misc', name: 'Misc', icon: '➕', sets: 3 },
+        { id: 'lateral_raise', name: 'Lateral Raise', icon: '🤸', sets: 3, dots: 4 },
+        { id: 'overhead_press', name: 'Overhead Press', icon: '⬆️', sets: 3, dots: 4 },
+        { id: 'rear_delt', name: 'Rear Delt', icon: '🔄', sets: 3, dots: 4 },
+        { id: 'shoulders_misc', name: 'Misc', icon: '➕', sets: 3, dots: 4 },
       ],
     },
     chest: {
@@ -36,9 +36,9 @@
       icon: '🫁',
       target: 15,
       exercises: [
-        { id: 'chest_press', name: 'Press', icon: '🏋️', sets: 3 },
-        { id: 'flys', name: 'Flys', icon: '🦅', sets: 3 },
-        { id: 'chest_misc', name: 'Misc', icon: '➕', sets: 3 },
+        { id: 'chest_press', name: 'Press', icon: '🏋️', sets: 3, dots: 4 },
+        { id: 'flys', name: 'Flys', icon: '🦅', sets: 3, dots: 4 },
+        { id: 'chest_misc', name: 'Misc', icon: '➕', sets: 3, dots: 4 },
       ],
     },
     legs: {
@@ -46,13 +46,13 @@
       icon: '🦵',
       target: 18,
       exercises: [
-        { id: 'leg_press', name: 'Leg Press', icon: '🦿', sets: 3 },
-        { id: 'leg_extension', name: 'Leg Extension', icon: '🦵', sets: 3 },
-        { id: 'leg_curl', name: 'Leg Curl', icon: '🔄', sets: 3 },
-        { id: 'calf_raise', name: 'Calf Raise', icon: '🦶', sets: 3 },
-        { id: 'rdl', name: 'RDL', icon: '🏋️', sets: 3 },
-        { id: 'squats', name: 'Squats', icon: '⬇️', sets: 3 },
-        { id: 'legs_misc', name: 'Misc', icon: '➕', sets: 3 },
+        { id: 'leg_press', name: 'Leg Press', icon: '🦿', sets: 3, dots: 4 },
+        { id: 'leg_extension', name: 'Leg Extension', icon: '🦵', sets: 3, dots: 4 },
+        { id: 'leg_curl', name: 'Leg Curl', icon: '🔄', sets: 3, dots: 4 },
+        { id: 'calf_raise', name: 'Calf Raise', icon: '🦶', sets: 3, dots: 4 },
+        { id: 'rdl', name: 'RDL', icon: '🏋️', sets: 3, dots: 4 },
+        { id: 'squats', name: 'Squats', icon: '⬇️', sets: 3, dots: 4 },
+        { id: 'legs_misc', name: 'Misc', icon: '➕', sets: 3, dots: 4 },
       ],
     },
     arms: {
@@ -60,10 +60,10 @@
       icon: '💪',
       target: 18,
       exercises: [
-        { id: 'bicep_curls', name: 'Bicep Curls', icon: '💪', sets: 3 },
-        { id: 'forearms', name: 'Forearms', icon: '🤜', sets: 3 },
-        { id: 'triceps', name: 'Triceps', icon: '🔻', sets: 3 },
-        { id: 'arms_misc', name: 'Misc', icon: '➕', sets: 3 },
+        { id: 'bicep_curls', name: 'Bicep Curls', icon: '💪', sets: 3, dots: 4 },
+        { id: 'forearms', name: 'Forearms', icon: '🤜', sets: 3, dots: 4 },
+        { id: 'triceps', name: 'Triceps', icon: '🔻', sets: 3, dots: 4 },
+        { id: 'arms_misc', name: 'Misc', icon: '➕', sets: 3, dots: 4 },
       ],
     },
     cardio: {
@@ -71,7 +71,11 @@
       icon: '🏃',
       target: 6,
       exercises: [
-        { id: 'run', name: 'Run', icon: '🏃', sets: 1 },
+        { id: 'run', name: 'Run', icon: '🏃', sets: 1, dots: 1 },
+        { id: 'stairs', name: 'Stairs', icon: '🪜', sets: 1, dots: 1 },
+        { id: 'rowing', name: 'Rowing', icon: '🚣', sets: 1, dots: 1 },
+        { id: 'sports', name: 'Sports', icon: '⚽', sets: 1, dots: 1 },
+        { id: 'walking', name: 'Walking', icon: '🚶', sets: 1, dots: 1 },
       ],
     },
   };
@@ -138,9 +142,10 @@
   }
 
   function freshnessClass(n) {
-    if (n <= 7) return 'fresh';
-    if (n <= 21) return 'stale';
-    return 'old';
+    if (n === 0) return 'freshness-today';
+    if (n === 1) return 'freshness-yesterday';
+    if (n <= 12) return 'freshness-recent';
+    return 'freshness-stale';
   }
 
   // ===== Data Queries =====
@@ -158,6 +163,12 @@
     return logs.length > 0 ? logs[0].date : null;
   }
 
+  function getLastSessionCount(exerciseId) {
+    const lastDate = getLastDate(exerciseId);
+    if (!lastDate) return 0;
+    return (data.logs[exerciseId] || []).filter(l => l.date === lastDate).length;
+  }
+
   function getRecentDates(exerciseId) {
     const logs = getExerciseLogs(exerciseId);
     const unique = [...new Set(logs.map(l => l.date))];
@@ -170,7 +181,7 @@
     let total = 0;
     for (const ex of group.exercises) {
       const logs = data.logs[ex.id] || [];
-      total += logs.filter(l => daysBetween(l.date, today) <= VOLUME_WINDOW_DAYS).length * ex.sets;
+      total += logs.filter(l => daysBetween(l.date, today) <= VOLUME_WINDOW_DAYS).length;
     }
     return total;
   }
@@ -247,6 +258,7 @@
 
       const row = document.createElement('div');
       row.className = 'summary-row';
+      row.dataset.group = key;
       row.innerHTML = `
         <span class="summary-label">${group.label}</span>
         <div class="summary-bar-track">
@@ -254,6 +266,7 @@
           <span class="summary-bar-value">${vol} / ${group.target}</span>
         </div>
       `;
+      row.addEventListener('click', () => switchToGroup(key));
       container.appendChild(row);
     }
   }
@@ -267,17 +280,18 @@
 
     for (const ex of group.exercises) {
       const todaySets = getTodaySetsCount(ex.id);
-      const maxSets = ex.sets;
       const lastDate = getLastDate(ex.id);
       const ago = lastDate ? daysAgo(lastDate) : null;
 
       const card = document.createElement('div');
       card.className = `exercise-card group-${activeGroup}`;
-      if (todaySets > 0) card.classList.add('just-logged');
+      const fc = lastDate ? freshnessClass(ago) : 'freshness-stale';
+      card.classList.add(fc);
 
-      // Build set dots
+      // Build set dots — each dot = 1 set today, resets daily
+      const dotCount = ex.dots;
       let dotsHtml = '';
-      for (let i = 0; i < maxSets; i++) {
+      for (let i = 0; i < dotCount; i++) {
         dotsHtml += `<span class="set-dot ${i < todaySets ? 'filled' : ''}"></span>`;
       }
 
@@ -286,7 +300,7 @@
       if (lastDate) {
         metaHtml = `<span class="${freshnessClass(ago)}">${daysAgoLabel(ago)}</span>`;
       } else {
-        metaHtml = `<span class="old">Never</span>`;
+        metaHtml = `<span class="freshness-stale">Never</span>`;
       }
 
       card.innerHTML = `
@@ -296,15 +310,14 @@
           <div class="exercise-meta">${metaHtml}</div>
         </div>
         <div class="exercise-sets">${dotsHtml}</div>
-        ${todaySets > 0 ? `<span class="today-sets-badge">${todaySets * maxSets}s</span>` : ''}
         <button class="exercise-more" data-exercise="${ex.id}" aria-label="History">⋯</button>
       `;
 
-      // Tap on card body to log a set
+      // Tap on card body to log 1 set
       card.addEventListener('click', (e) => {
         if (e.target.closest('.exercise-more')) return;
         logExercise(ex.id);
-        showToast(`+${maxSets} sets ${sanitize(ex.name)}`);
+        showToast(`+1 set ${sanitize(ex.name)}`);
       });
 
       // Tap ⋯ for history
@@ -346,8 +359,7 @@
               <div class="history-ago ${freshnessClass(ago)}">${daysAgoLabel(ago)}</div>
             </div>
             <div style="text-align:right">
-              <div style="font-weight:600">${entries.length} × ${exercise.sets} sets</div>
-              <div style="font-size:0.75rem;color:var(--text-dim)">${entries.length * exercise.sets} total sets</div>
+              <div style="font-weight:600">${entries.length} sets</div>
             </div>
           </div>
         `;
@@ -417,14 +429,23 @@
   }
 
   // ===== Tab Navigation =====
+  function switchToGroup(groupKey) {
+    const tabButtons = document.querySelectorAll('.tab');
+    tabButtons.forEach(b => b.classList.remove('active'));
+    const target = document.querySelector(`.tab[data-group="${groupKey}"]`);
+    if (target) {
+      target.classList.add('active');
+      target.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+    activeGroup = groupKey;
+    renderExercises();
+  }
+
   function initTabs() {
     const tabButtons = document.querySelectorAll('.tab');
     tabButtons.forEach(btn => {
       btn.addEventListener('click', () => {
-        tabButtons.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        activeGroup = btn.dataset.group;
-        renderExercises();
+        switchToGroup(btn.dataset.group);
       });
     });
   }

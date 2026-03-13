@@ -132,13 +132,7 @@ body {
 }
 
 .summary-row.faded {
-  opacity: 0;
-  max-height: 0;
-  padding: 0 10px;
-  margin: 0;
-  pointer-events: none;
-  overflow: hidden;
-  border: none;
+  opacity: 0.15;
 }
 
 .summary-row:active {
@@ -175,10 +169,10 @@ body {
 }
 
 .summary-bar-fill {
+  position: absolute;
+  top: 0;
   height: 100%;
-  border-radius: 8px;
   transition: width 0.4s ease;
-  min-width: 2px;
 }
 
 .summary-bar-push {
@@ -515,7 +509,12 @@ body {
 }
 
 .history-grid-scroll {
-  overflow-x: auto;
+  display: grid;
+  grid-template-columns: 90px repeat(14, 32px);
+  gap: 3px;
+  align-items: center;
+  overflow: auto;
+  max-height: 50vh;
   scrollbar-width: none;
   -ms-overflow-style: none;
   -webkit-overflow-scrolling: touch;
@@ -523,24 +522,11 @@ body {
 
 .history-grid-scroll::-webkit-scrollbar { display: none; }
 
-.history-grid-row {
-  display: grid;
-  grid-template-columns: 90px repeat(14, 32px);
-  gap: 3px;
-  align-items: center;
-  min-height: 36px;
-}
-
-.history-grid-header {
-  min-height: 40px;
-  margin-bottom: 4px;
-  position: sticky;
-  top: 0;
-  background: var(--surface);
-  z-index: 1;
-}
-
 .history-grid-name {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--surface);
   font-size: 0.72rem;
   font-weight: 600;
   color: var(--text);
@@ -548,15 +534,32 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   padding-right: 6px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+}
+
+.history-grid-corner {
+  position: sticky;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  background: var(--surface);
 }
 
 .history-grid-day {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--surface);
   display: flex;
   flex-direction: column;
   align-items: center;
   font-size: 0.6rem;
   color: var(--text-dim);
   line-height: 1.2;
+  min-height: 40px;
+  justify-content: center;
 }
 
 .history-grid-cell {
@@ -618,13 +621,6 @@ body {
 .group-legs .exercise-icon { background: rgba(46, 213, 115, 0.15); color: #2ed573; }
 .group-arms .exercise-icon { background: rgba(206, 130, 255, 0.15); color: #ce82ff; }
 .group-cardio .exercise-icon { background: rgba(255, 234, 100, 0.15); color: #ffea64; }
-
-.summary-bar-fill.group-back { background: #63b3ff; }
-.summary-bar-fill.group-shoulders { background: #ff9f43; }
-.summary-bar-fill.group-chest { background: #ff6b81; }
-.summary-bar-fill.group-legs { background: #2ed573; }
-.summary-bar-fill.group-arms { background: #ce82ff; }
-.summary-bar-fill.group-cardio { background: #ffea64; }
 
 /* ===== Undo bar ===== */
 .undo-bar {

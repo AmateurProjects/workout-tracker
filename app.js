@@ -210,16 +210,23 @@
     const today = todayStr();
     let total = 0;
     let pushed = 0;
+    // Freshness buckets: today(0), yesterday(1), recent(2-12), stale(13+)
+    const buckets = { today: 0, yesterday: 0, recent: 0, stale: 0 };
     for (const ex of group.exercises) {
       const logs = data.logs[ex.id] || [];
       for (const l of logs) {
-        if (daysBetween(l.date, today) <= VOLUME_WINDOW_DAYS) {
+        const ago = daysBetween(l.date, today);
+        if (ago <= VOLUME_WINDOW_DAYS) {
           total++;
           if (l.push) pushed++;
+          if (ago === 0) buckets.today++;
+          else if (ago === 1) buckets.yesterday++;
+          else if (ago <= 12) buckets.recent++;
+          else buckets.stale++;
         }
       }
     }
-    return { total, pushed };
+    return { total, pushed, buckets };
   }
 
   function getDailySetCount() {
@@ -370,9 +377,25 @@
     for (const key of groupKeys) {
       const group = MUSCLE_GROUPS[key];
       const target = getTarget(key);
-      const { total: vol, pushed: pushVol } = getGroupStats14Days(key);
-      const pct = target > 0 ? Math.min((vol / target) * 100, 100) : 0;
+      const { total: vol, pushed: pushVol, buckets } = getGroupStats14Days(key);
       const pushPct = target > 0 ? Math.min((pushVol / target) * 100, 100) : 0;
+
+      // Build segmented bar fills ordered: today, yesterday, recent, stale
+      const segments = [
+        { count: buckets.today, color: '#4ade80' },
+        { count: buckets.yesterday, color: '#22c55e' },
+        { count: buckets.recent, color: '#fbbf24' },
+        { count: buckets.stale, color: '#f87171' },
+      ];
+      let segmentsHtml = '';
+      let leftPct = 0;
+      for (const seg of segments) {
+        if (seg.count <= 0 || target <= 0) continue;
+        const w = Math.min(seg.count / target * 100, 100 - leftPct);
+        if (w <= 0) continue;
+        segmentsHtml += `<div class="summary-bar-fill" style="left:${leftPct}%;width:${w}%;background:${seg.color}"></div>`;
+        leftPct += w;
+      }
 
       const row = document.createElement('div');
       row.className = 'summary-row';
@@ -382,14 +405,19 @@
       row.innerHTML = `
         <span class="summary-label">${group.label}</span>
         <div class="summary-bar-track">
-          <div class="summary-bar-fill group-${key}" style="width:${pct}%"></div>
-          ${pushVol > 0 ? `<div class="summary-bar-push group-${key}" style="width:${pushPct}%"></div>` : ''}
+          ${segmentsHtml}
+          ${pushVol > 0 ? `<div class="summary-bar-push" style="width:${pushPct}%"></div>` : ''}
           <span class="summary-bar-value">${vol} / ${target}</span>
         </div>
       `;
       row.addEventListener('click', (e) => {
         if (e.target.closest('.target-btn')) return;
-        switchToGroup(key);
+        // Any tap on any row (active or faded) toggles back to full view
+        if (activeGroup) {
+          switchToGroup(activeGroup); // toggles off
+        } else {
+          switchToGroup(key);
+        }
       });
 
       container.appendChild(row);
@@ -414,6 +442,30 @@
         });
         container.appendChild(stepperRow);
       }
+    }
+
+    // Clip and scroll to center active row
+    if (activeGroup) {
+      requestAnimationFrame(() => {
+        const activeRow = container.querySelector('.summary-row.active');
+        const stepper = container.querySelector('.target-stepper-row');
+        if (activeRow) {
+          const rowH = activeRow.offsetHeight;
+          const stepperH = stepper ? stepper.offsetHeight : 0;
+          const gap = 10; // matches #summary-bars gap
+          // Visible window: half-row + gap + active row + gap + stepper + gap + half-row
+          const visibleH = rowH * 0.5 + gap + rowH + gap + stepperH + gap + rowH * 0.5;
+          container.style.maxHeight = visibleH + 'px';
+          container.style.overflow = 'hidden';
+          // Scroll so active row is centered in the window
+          const rowTop = activeRow.offsetTop;
+          const scrollTarget = rowTop - (rowH * 0.5 + gap);
+          container.scrollTop = Math.max(0, scrollTarget);
+        }
+      });
+    } else {
+      container.style.maxHeight = '';
+      container.style.overflow = '';
     }
   }
 
@@ -890,18 +942,17 @@
     }
     tabsHtml += '</div>';
 
-    // Day header row
-    let headerHtml = '<div class="history-grid-row history-grid-header"><div class="history-grid-name"></div>';
+    // Day header cells (flat — direct children of the grid scroll container)
+    let headerHtml = '<div class="history-grid-name history-grid-corner"></div>';
     for (const day of days) {
       headerHtml += `<div class="history-grid-day"><span>${day.label}</span><span>${day.num}</span></div>`;
     }
-    headerHtml += '</div>';
 
-    // Exercise rows for current group
+    // Exercise rows for current group (flat — no row wrappers)
     const exercises = MUSCLE_GROUPS[currentGroup].exercises;
     let rowsHtml = '';
     for (const ex of exercises) {
-      rowsHtml += `<div class="history-grid-row"><div class="history-grid-name">${sanitize(ex.name)}</div>`;
+      rowsHtml += `<div class="history-grid-name">${sanitize(ex.name)}</div>`;
       for (const day of days) {
         const logs = (data.logs[ex.id] || []).filter(l => l.date === day.date);
         const count = logs.length;
@@ -910,7 +961,6 @@
         rowsHtml += `<span class="history-cell-num${count > 0 ? ' has-sets' : ''}">${count || ''}</span>`;
         rowsHtml += '</div>';
       }
-      rowsHtml += '</div>';
     }
 
     body.innerHTML = `

@@ -242,10 +242,14 @@
   }
 
   // ===== Rendering =====
+  let skipAnimation = false;
+
   function renderAll() {
     renderDate();
     renderSummary();
+    skipAnimation = true;
     renderExercises();
+    skipAnimation = false;
   }
 
   function renderDate() {
@@ -320,6 +324,7 @@
     const group = MUSCLE_GROUPS[activeGroup];
     if (!group) return;
 
+    let idx = 0;
     for (const ex of group.exercises) {
       const todaySets = getTodaySetsCount(ex.id);
       const lastDate = getLastDate(ex.id);
@@ -378,7 +383,81 @@
       });
 
       container.appendChild(card);
+
+      // Animate entrance based on group
+      animateCardIn(card, activeGroup, idx);
+      idx++;
     }
+  }
+
+  const GROUP_ANIMATIONS = {
+    back: (card, i) => {
+      // Cascade down
+      card.style.opacity = '0';
+      card.style.transform = 'translateY(-30px)';
+      setTimeout(() => {
+        card.style.transition = 'opacity 0.35s ease, transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)';
+        card.style.opacity = '1';
+        card.style.transform = 'translateY(0)';
+      }, i * 60);
+    },
+    shoulders: (card, i) => {
+      // Fan out from center
+      const dir = i % 2 === 0 ? -1 : 1;
+      card.style.opacity = '0';
+      card.style.transform = `translateX(${dir * 60}px) rotate(${dir * 8}deg)`;
+      setTimeout(() => {
+        card.style.transition = 'opacity 0.4s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+        card.style.opacity = '1';
+        card.style.transform = 'translateX(0) rotate(0deg)';
+      }, i * 70);
+    },
+    chest: (card, i) => {
+      // Scale up with bounce
+      card.style.opacity = '0';
+      card.style.transform = 'scale(0.3)';
+      setTimeout(() => {
+        card.style.transition = 'opacity 0.4s ease, transform 0.5s cubic-bezier(0.34, 1.8, 0.64, 1)';
+        card.style.opacity = '1';
+        card.style.transform = 'scale(1)';
+      }, i * 80);
+    },
+    legs: (card, i) => {
+      // Slide up from bottom
+      card.style.opacity = '0';
+      card.style.transform = 'translateY(80px)';
+      setTimeout(() => {
+        card.style.transition = 'opacity 0.35s ease, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1)';
+        card.style.opacity = '1';
+        card.style.transform = 'translateY(0)';
+      }, i * 55);
+    },
+    arms: (card, i) => {
+      // Flip in from side
+      card.style.opacity = '0';
+      card.style.transform = 'perspective(600px) rotateY(90deg)';
+      setTimeout(() => {
+        card.style.transition = 'opacity 0.4s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1)';
+        card.style.opacity = '1';
+        card.style.transform = 'perspective(600px) rotateY(0deg)';
+      }, i * 75);
+    },
+    cardio: (card, i) => {
+      // Zoom in with spin
+      card.style.opacity = '0';
+      card.style.transform = 'scale(0) rotate(180deg)';
+      setTimeout(() => {
+        card.style.transition = 'opacity 0.45s ease, transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1)';
+        card.style.opacity = '1';
+        card.style.transform = 'scale(1) rotate(0deg)';
+      }, i * 90);
+    },
+  };
+
+  function animateCardIn(card, groupKey, index) {
+    if (skipAnimation) return;
+    const anim = GROUP_ANIMATIONS[groupKey];
+    if (anim) anim(card, index);
   }
 
   // ===== History Modal =====
@@ -479,11 +558,27 @@
 
   // ===== Tab Navigation =====
   function switchToGroup(groupKey) {
+    if (activeGroup === groupKey) {
+      // Toggle off
+      collapseExercises();
+      activeGroup = null;
+      renderSummary();
+      return;
+    }
     activeGroup = groupKey;
     renderExercises();
-    // Scroll exercises into view
-    const el = document.getElementById('exercises');
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    renderSummary();
+  }
+
+  function collapseExercises() {
+    const container = document.getElementById('exercises');
+    const cards = container.querySelectorAll('.exercise-card');
+    cards.forEach((card, i) => {
+      card.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+      card.style.opacity = '0';
+      card.style.transform = 'scale(0.9)';
+    });
+    setTimeout(() => { container.innerHTML = ''; }, 250);
   }
 
   // ===== Modal Close =====
@@ -531,8 +626,10 @@
   // ===== Init =====
   function init() {
     seedIfEmpty();
+    activeGroup = null;
     initModal();
-    renderAll();
+    renderDate();
+    renderSummary();
   }
 
   if (document.readyState === 'loading') {

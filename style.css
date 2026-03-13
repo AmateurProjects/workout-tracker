@@ -66,34 +66,35 @@ body {
 .card {
   background: var(--surface);
   border-radius: var(--radius);
-  padding: 16px;
+  padding: 20px;
   margin-bottom: 16px;
 }
 
 .card h2 {
-  font-size: 0.9rem;
+  font-size: 1rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-dim);
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 /* ===== Summary Bars ===== */
 #summary-bars {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .summary-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  border-radius: 6px;
-  padding: 4px 0;
-  transition: background 0.15s;
+  border-radius: 8px;
+  padding: 8px 10px;
+  transition: background 0.15s, box-shadow 0.15s;
+  border: 2px solid transparent;
 }
 
 .summary-row:active {
@@ -101,39 +102,47 @@ body {
 }
 
 .summary-row.active {
-  background: var(--surface2);
+  background: rgba(108, 99, 255, 0.1);
+  border-color: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
 }
 
 .summary-label {
-  width: 80px;
-  font-size: 0.8rem;
+  width: 90px;
+  font-size: 0.9rem;
   color: var(--text-dim);
   text-align: right;
   flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.summary-row.active .summary-label {
+  color: var(--text);
+  font-weight: 600;
 }
 
 .summary-bar-track {
   flex: 1;
-  height: 22px;
+  height: 30px;
   background: var(--bg);
-  border-radius: 6px;
+  border-radius: 8px;
   overflow: hidden;
   position: relative;
 }
 
 .summary-bar-fill {
   height: 100%;
-  border-radius: 6px;
+  border-radius: 8px;
   transition: width 0.4s ease;
   min-width: 2px;
 }
 
 .summary-bar-value {
   position: absolute;
-  right: 8px;
+  right: 10px;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: var(--text);
 }

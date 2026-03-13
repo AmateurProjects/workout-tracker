@@ -187,12 +187,31 @@
     return total;
   }
 
+  function getGroupForExercise(exerciseId) {
+    for (const [key, group] of Object.entries(MUSCLE_GROUPS)) {
+      if (group.exercises.some(ex => ex.id === exerciseId)) return key;
+    }
+    return null;
+  }
+
   // ===== Actions =====
   function logExercise(exerciseId) {
     if (!data.logs[exerciseId]) data.logs[exerciseId] = [];
+
+    // Check volume before
+    const groupKey = getGroupForExercise(exerciseId);
+    const volBefore = groupKey ? getGroupVolume14Days(groupKey) : 0;
+    const target = groupKey ? getTarget(groupKey) : 0;
+
     const entry = { date: todayStr(), ts: Date.now() };
     data.logs[exerciseId].push(entry);
     saveData();
+
+    // Check if goal just reached
+    const volAfter = groupKey ? getGroupVolume14Days(groupKey) : 0;
+    if (target > 0 && volBefore < target && volAfter >= target) {
+      celebrate(MUSCLE_GROUPS[groupKey].label);
+    }
 
     lastAction = { exerciseId, entry };
     showUndo(exerciseId);
@@ -443,14 +462,14 @@
       }, i * 75);
     },
     cardio: (card, i) => {
-      // Zoom in with spin
+      // Elastic drop from above
       card.style.opacity = '0';
-      card.style.transform = 'scale(0) rotate(180deg)';
+      card.style.transform = 'translateY(-100px) scaleY(0.4)';
       setTimeout(() => {
-        card.style.transition = 'opacity 0.45s ease, transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1)';
+        card.style.transition = 'opacity 0.3s ease, transform 0.6s cubic-bezier(0.22, 1.5, 0.36, 1)';
         card.style.opacity = '1';
-        card.style.transform = 'scale(1) rotate(0deg)';
-      }, i * 90);
+        card.style.transform = 'translateY(0) scaleY(1)';
+      }, i * 100);
     },
   };
 
@@ -458,6 +477,40 @@
     if (skipAnimation) return;
     const anim = GROUP_ANIMATIONS[groupKey];
     if (anim) anim(card, index);
+  }
+
+  // ===== Celebration =====
+  function celebrate(groupLabel) {
+    const overlay = document.createElement('div');
+    overlay.className = 'celebrate-overlay';
+
+    // Banner text
+    const banner = document.createElement('div');
+    banner.className = 'celebrate-banner';
+    banner.textContent = `${groupLabel} Goal Reached!`;
+    overlay.appendChild(banner);
+
+    // Confetti particles
+    const colors = ['#4ade80', '#6c63ff', '#fbbf24', '#ff6b81', '#63b3ff', '#ce82ff', '#ff9f43', '#2ed573'];
+    const shapes = ['●', '■', '▲', '★', '◆'];
+    for (let i = 0; i < 60; i++) {
+      const particle = document.createElement('div');
+      particle.className = 'confetti';
+      particle.textContent = shapes[Math.floor(Math.random() * shapes.length)];
+      particle.style.color = colors[Math.floor(Math.random() * colors.length)];
+      particle.style.left = Math.random() * 100 + '%';
+      particle.style.animationDelay = Math.random() * 0.5 + 's';
+      particle.style.animationDuration = (1.5 + Math.random() * 1.5) + 's';
+      particle.style.fontSize = (10 + Math.random() * 18) + 'px';
+      overlay.appendChild(particle);
+    }
+
+    document.getElementById('app').appendChild(overlay);
+
+    setTimeout(() => {
+      overlay.classList.add('celebrate-fade');
+      setTimeout(() => overlay.remove(), 500);
+    }, 2200);
   }
 
   // ===== History Modal =====

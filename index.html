@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>Workout Tracker</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header id="header">
+      <h1>Workout Tracker</h1>
+      <div id="today-date"></div>
+    </header>
+
+    <!-- 14-Day Volume Summary -->
+    <section id="summary" class="card">
+      <h2>Last 14 Days</h2>
+      <div id="summary-bars"></div>
+    </section>
+
+    <!-- Muscle Group Tabs -->
+    <nav id="tabs">
+      <button class="tab active" data-group="back">Back</button>
+      <button class="tab" data-group="shoulders">Shoulders</button>
+      <button class="tab" data-group="chest">Chest</button>
+      <button class="tab" data-group="legs">Legs</button>
+      <button class="tab" data-group="arms">Arms</button>
+      <button class="tab" data-group="cardio">Cardio</button>
+    </nav>
+
+    <!-- Exercise List -->
+    <section id="exercises"></section>
+
+    <!-- History Modal -->
+    <div id="modal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modal-title"></h3>
+          <button id="modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div id="modal-body"></div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

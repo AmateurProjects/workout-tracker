@@ -238,11 +238,13 @@
 
   function getDailyExerciseCount() {
     const today = todayStr();
-    const ids = new Set();
+    const cardioIds = new Set(MUSCLE_GROUPS.cardio.exercises.map(e => e.id));
+    let count = 0;
     for (const [id, logs] of Object.entries(data.logs)) {
-      if (logs.some(l => l.date === today)) ids.add(id);
+      if (cardioIds.has(id)) continue;
+      if (logs.some(l => l.date === today)) count++;
     }
-    return ids.size;
+    return count;
   }
 
   function getDailyCardioCount() {
@@ -416,7 +418,7 @@
       row.className = 'summary-row';
       row.dataset.group = key;
       if (key === activeGroup) row.classList.add('active');
-      if (activeGroup && key !== activeGroup) row.classList.add('collapsed');
+      if (activeGroup && key !== activeGroup) row.classList.add('faded');
       row.innerHTML = `
         <span class="summary-label">${group.label}</span>
         <div class="summary-bar-track">
@@ -503,8 +505,8 @@
           <div class="exercise-name">${sanitize(ex.name)}</div>
           <div class="exercise-meta">${metaHtml}</div>
         </div>
-        <div class="exercise-sets">${dotsHtml}</div>
         <button class="push-icon${hasPushWindow ? ' push-icon-active' : ''}" data-exercise="${ex.id}" aria-label="Mark as pushed">🔥</button>
+        <div class="exercise-sets">${dotsHtml}</div>
         <button class="exercise-more" data-exercise="${ex.id}" aria-label="History">⋯</button>
       `;
 
@@ -866,6 +868,16 @@
     initModal();
     renderDate();
     renderSummary();
+
+    // Tap anywhere on the summary card (except bars/buttons) to deselect
+    document.getElementById('summary').addEventListener('click', (e) => {
+      if (e.target.closest('.summary-row') || e.target.closest('.target-stepper-row')) return;
+      if (activeGroup) {
+        collapseExercises();
+        activeGroup = null;
+        renderSummary();
+      }
+    });
   }
 
   if (document.readyState === 'loading') {

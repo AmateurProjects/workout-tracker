@@ -72,7 +72,7 @@ body {
 }
 
 #summary.card-compact {
-  padding: 12px 20px;
+  padding: 8px 20px;
 }
 
 #summary.card-compact h2 {
@@ -81,7 +81,11 @@ body {
   opacity: 0;
   height: 0;
   overflow: hidden;
-  transition: all 0.3s ease;
+}
+
+#summary.card-compact #summary-bars {
+  max-height: 120px;
+  overflow: hidden;
 }
 
 .card h2 {
@@ -97,6 +101,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  transition: transform 0.3s ease;
 }
 
 .summary-row {
@@ -303,8 +308,9 @@ body {
   display: flex;
   gap: 5px;
   flex-shrink: 0;
-  padding: 8px;
-  margin: -8px;
+  padding: 14px;
+  margin: -14px;
+  margin-left: 4px;
   cursor: pointer;
 }
 

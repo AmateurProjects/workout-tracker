@@ -415,6 +415,28 @@
         container.appendChild(stepperRow);
       }
     }
+
+    // When compact, shift container so active row is centered in the clipped area
+    if (activeGroup) {
+      requestAnimationFrame(() => {
+        const activeRow = container.querySelector('.summary-row.active');
+        if (activeRow) {
+          const containerRect = container.getBoundingClientRect();
+          const rowRect = activeRow.getBoundingClientRect();
+          const maxH = 120;
+          // Current row offset relative to container top (without any transform)
+          const rowTop = activeRow.offsetTop;
+          const rowMid = rowTop + rowRect.height / 2;
+          const shift = Math.max(0, rowMid - maxH / 2);
+          // Don't shift so far that bottom is empty
+          const totalH = container.scrollHeight;
+          const maxShift = Math.max(0, totalH - maxH);
+          container.style.transform = `translateY(-${Math.min(shift, maxShift)}px)`;
+        }
+      });
+    } else {
+      container.style.transform = '';
+    }
   }
 
   function renderExercises() {

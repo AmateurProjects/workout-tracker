@@ -1338,6 +1338,14 @@
     }
     if (!targetEl) targetEl = document.getElementById('app');
 
+    // Ensure target is visible in the viewport
+    targetEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    // Small delay to let scroll settle before measuring
+    requestAnimationFrame(() => { positionTutorial(targetEl, step); });
+  }
+
+  function positionTutorial(targetEl, step) {
     const rect = targetEl.getBoundingClientRect();
     const pad = 8;
 
@@ -1395,13 +1403,23 @@
     const vh = window.innerHeight;
     let tooltipLeft = Math.max(16, Math.min(rect.left + rect.width / 2 - tooltipRect.width / 2, vw - tooltipRect.width - 16));
 
+    let tooltipTop;
     if (step.position === 'below') {
-      tooltip.style.top = (rect.bottom + pad + 12) + 'px';
+      tooltipTop = rect.bottom + pad + 12;
+      // If it would overflow the bottom, flip above
+      if (tooltipTop + tooltipRect.height > vh - 16) {
+        tooltipTop = rect.top - pad - 12 - tooltipRect.height;
+      }
     } else {
-      let above = rect.top - pad - 12 - tooltipRect.height;
-      if (above < 16) above = rect.bottom + pad + 12;
-      tooltip.style.top = above + 'px';
+      tooltipTop = rect.top - pad - 12 - tooltipRect.height;
+      // If it would overflow the top, flip below
+      if (tooltipTop < 16) {
+        tooltipTop = rect.bottom + pad + 12;
+      }
     }
+    // Final clamp to viewport
+    tooltipTop = Math.max(16, Math.min(tooltipTop, vh - tooltipRect.height - 16));
+    tooltip.style.top = tooltipTop + 'px';
     tooltip.style.left = tooltipLeft + 'px';
 
     // Event handlers

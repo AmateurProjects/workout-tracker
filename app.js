@@ -87,16 +87,18 @@
       EXERCISE_GROUP_MAP[ex.id] = key;
     }
   }
+
+  let data = loadData();
+  // Ensure customExercises exists for older data
+  if (!data.customExercises) data.customExercises = {};
+
   // Also register any saved custom exercises
-  for (const [key, exercises] of Object.entries(data.customExercises || {})) {
+  for (const [key, exercises] of Object.entries(data.customExercises)) {
     for (const ex of exercises) {
       EXERCISE_GROUP_MAP[ex.id] = key;
     }
   }
 
-  let data = loadData();
-  // Ensure customExercises exists for older data
-  if (!data.customExercises) data.customExercises = {};
   let activeGroup = null;
   let undoTimeout = null;
   let lastAction = null;

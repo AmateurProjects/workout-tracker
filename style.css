@@ -162,9 +162,9 @@ body {
 }
 
 .summary-row.active {
-  background: rgba(108, 99, 255, 0.1);
-  border-color: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
+  background: color-mix(in srgb, var(--group-color, var(--accent)) 12%, transparent);
+  border-color: var(--group-color, var(--accent));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--group-color, var(--accent)) 30%, transparent);
 }
 
 .summary-row.focus-glow {
@@ -504,10 +504,8 @@ body {
 .history-tabs {
   display: flex;
   gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 12px;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  justify-content: center;
+  padding-bottom: 8px;
 }
 
 .history-tabs::-webkit-scrollbar { display: none; }
@@ -600,14 +598,11 @@ body {
   background: var(--surface2);
 }
 
-.history-cell-num {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--text-dim);
-}
-
-.history-cell-num.has-sets {
+.history-grid-cell.checked {
+  background: rgba(108, 99, 255, 0.2);
   color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: 700;
 }
 
 /* ===== Toast ===== */

@@ -851,7 +851,16 @@
     const save = () => {
       const value = document.getElementById('pr-value').value.trim();
       const unit = document.getElementById('pr-unit').value.trim();
-      if (!value) return;
+
+      // Empty value = clear the PR
+      if (!value) {
+        delete data.personalRecords[exerciseId];
+        saveData();
+        closeModal();
+        renderAll();
+        showToast('PR removed');
+        return;
+      }
 
       const today = todayStr();
       const oldPR = data.personalRecords[exerciseId];
@@ -1445,6 +1454,8 @@
     document.getElementById('clear-all-btn').addEventListener('click', () => {
       if (confirm('Delete ALL workout data? This cannot be undone.')) {
         data = { logs: {}, targets: {}, customExercises: {}, exerciseOverrides: {}, hiddenExercises: {}, personalRecords: {} };
+        activeGroup = null;
+        lastCelebratedMilestone = 0;
         saveData();
         closeModal();
         renderAll();
@@ -1547,7 +1558,7 @@
     const title = document.getElementById('modal-title');
     const body = document.getElementById('modal-body');
 
-    title.textContent = 'Edit History';
+    title.textContent = 'Edit History (Sets Estimated)';
 
     // Build 14 days (today + 13 prior)
     const days = [];
@@ -1569,7 +1580,14 @@
     const currentGroup = selectedGroup || groupKeys[0];
 
     let tabsHtml = '<div class="history-tabs">';
-    for (const key of groupKeys) {
+    const topRow = groupKeys.slice(0, 3);
+    const bottomRow = groupKeys.slice(3);
+    for (const key of topRow) {
+      const g = MUSCLE_GROUPS[key];
+      tabsHtml += `<button class="history-tab${key === currentGroup ? ' active' : ''}" data-group="${key}">${g.label}</button>`;
+    }
+    tabsHtml += '</div><div class="history-tabs">';
+    for (const key of bottomRow) {
       const g = MUSCLE_GROUPS[key];
       tabsHtml += `<button class="history-tab${key === currentGroup ? ' active' : ''}" data-group="${key}">${g.label}</button>`;
     }
@@ -1581,6 +1599,9 @@
       headerHtml += `<div class="history-grid-day"><span>${day.label}</span><span>${day.num}</span></div>`;
     }
 
+    const isCardio = currentGroup === 'cardio';
+    const defaultSets = isCardio ? 1 : 3;
+
     // Exercise rows for current group (flat — no row wrappers)
     const exercises = MUSCLE_GROUPS[currentGroup].exercises;
     let rowsHtml = '';
@@ -1589,9 +1610,8 @@
       for (const day of days) {
         const logs = (data.logs[ex.id] || []).filter(l => l.date === day.date);
         const count = logs.length;
-        const maxDots = ex.dots;
-        rowsHtml += `<div class="history-grid-cell" data-exercise="${ex.id}" data-date="${day.date}" data-count="${count}" data-max="${maxDots}">`;
-        rowsHtml += `<span class="history-cell-num${count > 0 ? ' has-sets' : ''}">${count || ''}</span>`;
+        rowsHtml += `<div class="history-grid-cell${count > 0 ? ' checked' : ''}" data-exercise="${ex.id}" data-date="${day.date}" data-count="${count}">`;
+        rowsHtml += count > 0 ? '✓' : '';
         rowsHtml += '</div>';
       }
     }
@@ -1614,32 +1634,32 @@
       });
     });
 
-    // Cell tapping
+    // Cell tapping — toggle on/off
     body.querySelectorAll('.history-grid-cell').forEach(cell => {
       cell.addEventListener('click', () => {
         const exId = cell.dataset.exercise;
         const date = cell.dataset.date;
-        const max = parseInt(cell.dataset.max, 10);
         let current = parseInt(cell.dataset.count, 10);
 
-        if (current >= max) {
+        if (current > 0) {
           // Remove all logs for this exercise on this date
           if (data.logs[exId]) {
             data.logs[exId] = data.logs[exId].filter(l => l.date !== date);
           }
           current = 0;
         } else {
-          // Add one log
+          // Add default sets
           if (!data.logs[exId]) data.logs[exId] = [];
-          data.logs[exId].push({ date, ts: parseDate(date).getTime() + data.logs[exId].filter(l => l.date === date).length });
-          current++;
+          for (let s = 0; s < defaultSets; s++) {
+            data.logs[exId].push({ date, ts: parseDate(date).getTime() + s });
+          }
+          current = defaultSets;
         }
 
         saveData();
         cell.dataset.count = current;
-        const numEl = cell.querySelector('.history-cell-num');
-        numEl.textContent = current || '';
-        numEl.classList.toggle('has-sets', current > 0);
+        cell.textContent = current > 0 ? '✓' : '';
+        cell.classList.toggle('checked', current > 0);
       });
     });
 

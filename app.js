@@ -101,9 +101,20 @@
   let undoTimeout = null;
   let lastAction = null;
   let pushWindow = null; // { exerciseId, ts, timer }
-  let cardioCelebrated = false;
-  let exerciseCelebrated = false;
+  let lastCelebratedMilestone = 0; // track highest milestone celebrated this session
+  let cardioCelebratedToday = false;
+  const celebratedGoals = new Set(); // track groups that have been goal-celebrated this session
   const _sanitizeEl = document.createElement('div');
+
+  // Milestone tiers for non-cardio daily sets
+  const MILESTONES = [
+    { sets: 3,  label: 'Warming Up', emoji: '🔥', particles: 8,  duration: 1200, vibrate: [50] },
+    { sets: 6,  label: 'Getting Strong', emoji: '💪', particles: 15, duration: 1600, vibrate: [50, 30, 50] },
+    { sets: 9,  label: 'On Fire', emoji: '🔥🔥', particles: 22, duration: 1800, vibrate: [50, 30, 80] },
+    { sets: 12, label: 'Beast Mode', emoji: '⚡', particles: 32, duration: 2200, vibrate: [60, 40, 60, 40, 100] },
+    { sets: 15, label: 'Unstoppable', emoji: '🚀', particles: 45, duration: 2600, vibrate: [80, 50, 80, 50, 150] },
+    { sets: 18, label: 'Legend', emoji: '🏆', particles: 65, duration: 3000, vibrate: [100, 60, 100, 60, 200] },
+  ];
 
   // ===== Persistence =====
   function loadData() {
@@ -238,6 +249,44 @@
     return { total, pushed, buckets };
   }
 
+  // Priority scoring: higher = more recommended to train
+  function getGroupPriorities() {
+    const today = todayStr();
+    const scores = {};
+    for (const key of Object.keys(MUSCLE_GROUPS)) {
+      const target = getTarget(key);
+      const { total, buckets } = getGroupStats14Days(key);
+      const deficit = Math.max(0, target - total);
+
+      // 1) Volume deficit score (0–100): how far behind goal
+      const deficitScore = target > 0 ? (deficit / target) * 100 : 0;
+
+      // 2) Expiry urgency: sets expiring soon add pressure
+      const expiryScore = target > 0 ? (buckets.expiring / target) * 40 : 0;
+
+      // 3) Recency penalty: trained today → lower priority
+      const exercises = getGroupExercises(key);
+      let mostRecentAgo = VOLUME_WINDOW_DAYS;
+      for (const ex of exercises) {
+        const last = getLastDate(ex.id);
+        if (last) mostRecentAgo = Math.min(mostRecentAgo, daysAgo(last));
+      }
+      // If trained today: heavy penalty. Yesterday: small penalty. 2+ days: bonus
+      let recencyScore = 0;
+      if (mostRecentAgo === 0) recencyScore = -50;
+      else if (mostRecentAgo === 1) recencyScore = -15;
+      else recencyScore = Math.min(mostRecentAgo * 5, 30);
+
+      scores[key] = {
+        score: deficitScore + expiryScore + recencyScore,
+        trainedToday: mostRecentAgo === 0,
+        deficit,
+        total,
+      };
+    }
+    return scores;
+  }
+
   function getDailySetCount() {
     const today = todayStr();
     const cardioIds = new Set(MUSCLE_GROUPS.cardio.exercises.map(e => e.id));
@@ -267,8 +316,6 @@
     const groupKey = EXERCISE_GROUP_MAP[exerciseId] || null;
     const volBefore = groupKey ? getGroupVolume14Days(groupKey) : 0;
     const target = groupKey ? getTarget(groupKey) : 0;
-    const dailyBefore = getDailySetCount();
-    const cardioBefore = getDailyCardioCount();
 
     const entry = { date: todayStr(), ts: Date.now() };
     data.logs[exerciseId].push(entry);
@@ -277,18 +324,20 @@
     // Snapshot after logging
     const volAfter = groupKey ? getGroupVolume14Days(groupKey) : 0;
     const dailyAfter = getDailySetCount();
-    const cardioAfter = getDailyCardioCount();
 
-    // Check daily workout completion (15 total sets or 1 cardio)
+    // Check milestone celebrations (non-cardio)
     const isCardio = MUSCLE_GROUPS.cardio.exercises.some(e => e.id === exerciseId);
-    if (isCardio && !cardioCelebrated && cardioBefore < 1 && cardioAfter >= 1) {
-      cardioCelebrated = true;
-      celebrateDaily();
-    } else if (!isCardio && !exerciseCelebrated && dailyBefore < 15 && dailyAfter >= 15) {
-      exerciseCelebrated = true;
-      celebrateDaily();
-    } else if (target > 0 && volBefore < target && volAfter >= target) {
-      celebrate(MUSCLE_GROUPS[groupKey].label + ' Goal Reached!');
+    if (!isCardio) {
+      checkMilestone(dailyAfter);
+      updateStreakBadge(dailyAfter);
+    } else if (!cardioCelebratedToday) {
+      cardioCelebratedToday = true;
+      celebrateCardio();
+    }
+    // Group goal celebration
+    if (target > 0 && volBefore < target && volAfter >= target && !celebratedGoals.has(groupKey)) {
+      celebratedGoals.add(groupKey);
+      celebrateGroupGoal(groupKey);
     }
 
     // Open push window
@@ -487,6 +536,14 @@
     container.innerHTML = '';
 
     const groupKeys = Object.keys(MUSCLE_GROUPS);
+    const priorities = getGroupPriorities();
+
+    // Rank groups by score (descending) — only non-active view
+    const ranked = groupKeys
+      .map(k => ({ key: k, ...priorities[k] }))
+      .sort((a, b) => b.score - a.score);
+    const topKey = ranked[0] ? ranked[0].key : null;
+    const focusKeys = new Set(ranked.slice(0, 2).filter(r => r.score > 0).map(r => r.key));
 
     for (const key of groupKeys) {
       // When a group is active, only render that group
@@ -494,34 +551,32 @@
 
       const group = MUSCLE_GROUPS[key];
       const target = getTarget(key);
-      const { total: vol, pushed: pushVol, buckets } = getGroupStats14Days(key);
+      const { total: vol, pushed: pushVol } = getGroupStats14Days(key);
+      const color = GROUP_COLORS[key] || '#6c63ff';
+      const fillPct = target > 0 ? Math.min((vol / target) * 100, 100) : 0;
       const pushPct = target > 0 ? Math.min((pushVol / target) * 100, 100) : 0;
 
-      // Build segmented bar fills ordered: recent, yesterday, today
-      const segments = [
-        { count: buckets.expiring, color: '#f87171' },
-        { count: buckets.recent, color: '#fbbf24' },
-        { count: buckets.yesterday, color: '#22c55e' },
-        { count: buckets.today, color: '#4ade80' },
-      ];
-      let segmentsHtml = '';
-      let leftPct = 0;
-      for (const seg of segments) {
-        if (seg.count <= 0 || target <= 0) continue;
-        const w = Math.min(seg.count / target * 100, 100 - leftPct);
-        if (w <= 0) continue;
-        segmentsHtml += `<div class="summary-bar-fill" style="left:${leftPct}%;width:${w}%;background:${seg.color}"></div>`;
-        leftPct += w;
-      }
+      const pri = priorities[key];
+      const isFocus = !activeGroup && focusKeys.has(key);
+      const isTop = !activeGroup && key === topKey && pri.score > 0;
+      const isResting = !activeGroup && pri.trainedToday && pri.deficit <= 0;
+
+      const labelText = (isTop ? '🎯 ' : '') + group.label;
 
       const row = document.createElement('div');
       row.className = 'summary-row';
       row.dataset.group = key;
       if (key === activeGroup) row.classList.add('active');
+      if (isFocus) row.classList.add('focus-glow');
+      if (isResting) row.classList.add('needs-rest');
+
+      // Set group color as CSS variable for glow
+      if (isFocus) row.style.setProperty('--group-color', color);
+
       row.innerHTML = `
-        <span class="summary-label">${group.label}</span>
+        <span class="summary-label">${labelText}</span>
         <div class="summary-bar-track">
-          ${segmentsHtml}
+          <div class="summary-bar-fill" style="width:${fillPct}%;background:${color}"></div>
           ${pushVol > 0 ? `<div class="summary-bar-push" style="width:${pushPct}%"></div>` : ''}
           <span class="summary-bar-value">${vol} / ${target}</span>
         </div>
@@ -883,6 +938,15 @@
   }
 
   // ===== Celebration =====
+  const GROUP_COLORS = {
+    back: '#63b3ff',
+    shoulders: '#ff9f43',
+    chest: '#ff6b81',
+    legs: '#2ed573',
+    arms: '#ce82ff',
+    cardio: '#ffea64',
+  };
+
   function celebrate(message) {
     const overlay = document.createElement('div');
     overlay.className = 'celebrate-overlay';
@@ -895,7 +959,7 @@
 
     // Confetti particles
     const colors = ['#4ade80', '#6c63ff', '#fbbf24', '#ff6b81', '#63b3ff', '#ce82ff', '#ff9f43', '#2ed573'];
-    const shapes = ['●', '■', '▲', '★', '◆'];
+    const shapes = ['\u25cf', '\u25a0', '\u25b2', '\u2605', '\u25c6'];
     for (let i = 0; i < 60; i++) {
       const particle = document.createElement('div');
       particle.className = 'confetti';
@@ -916,31 +980,96 @@
     }, 2200);
   }
 
+  function celebrateGroupGoal(groupKey) {
+    haptic([100, 60, 100, 60, 200]);
+
+    const group = MUSCLE_GROUPS[groupKey];
+    const color = GROUP_COLORS[groupKey] || '#6c63ff';
+    const overlay = document.createElement('div');
+    overlay.className = 'celebrate-overlay';
+
+    // Gold shimmer banner with group name
+    const banner = document.createElement('div');
+    banner.className = 'celebrate-banner banner-gold banner-glow';
+    banner.textContent = `${group.icon} ${group.label} Goal Reached!`;
+    overlay.appendChild(banner);
+
+    // Ring burst — colored ring expanding outward
+    const ring = document.createElement('div');
+    ring.className = 'goal-ring';
+    ring.style.borderColor = color;
+    ring.style.boxShadow = `0 0 40px ${color}, 0 0 80px ${color}`;
+    overlay.appendChild(ring);
+
+    // Group-colored starburst particles
+    const emojis = ['\u2b50', '\u2728', '\ud83c\udf1f', '\u26a1', group.icon, '\ud83c\udfc6'];
+    for (let i = 0; i < 40; i++) {
+      const p = document.createElement('div');
+      p.className = 'starburst';
+      p.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+      const angle = (Math.PI * 2 * i) / 40 + (Math.random() - 0.5) * 0.3;
+      const dist = 100 + Math.random() * 220;
+      p.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
+      p.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
+      p.style.animationDelay = Math.random() * 0.3 + 's';
+      p.style.animationDuration = (0.8 + Math.random() * 0.6) + 's';
+      p.style.fontSize = (16 + Math.random() * 18) + 'px';
+      overlay.appendChild(p);
+    }
+
+    // Group-colored confetti rain
+    const shapes = ['\u25cf', '\u25a0', '\u2605', '\u25c6'];
+    for (let i = 0; i < 35; i++) {
+      const p = document.createElement('div');
+      p.className = 'confetti';
+      p.textContent = shapes[Math.floor(Math.random() * shapes.length)];
+      p.style.color = color;
+      p.style.left = Math.random() * 100 + '%';
+      p.style.animationDelay = Math.random() * 0.6 + 's';
+      p.style.animationDuration = (1.5 + Math.random() * 1.5) + 's';
+      p.style.fontSize = (10 + Math.random() * 16) + 'px';
+      overlay.appendChild(p);
+    }
+
+    // Screen shake
+    document.getElementById('app').classList.add('screen-shake');
+    setTimeout(() => document.getElementById('app').classList.remove('screen-shake'), 500);
+
+    document.getElementById('app').appendChild(overlay);
+
+    setTimeout(() => {
+      overlay.classList.add('celebrate-fade');
+      setTimeout(() => overlay.remove(), 500);
+    }, 3200);
+  }
+
   function celebrateDaily() {
+    // Legacy — no longer called, kept as fallback
+    celebrateMilestone(MILESTONES[MILESTONES.length - 1]);
+  }
+
+  function celebrateCardio() {
+    haptic([60, 40, 80]);
+
     const overlay = document.createElement('div');
     overlay.className = 'celebrate-overlay';
 
     // Banner
     const banner = document.createElement('div');
     banner.className = 'celebrate-banner';
-    banner.textContent = 'Workout Complete! \ud83d\udcaa';
+    banner.textContent = 'Cardio Logged \ud83c\udfc3';
     overlay.appendChild(banner);
 
-    // Starburst particles — explode outward from center
-    const emojis = ['\u2b50', '\ud83d\udcaa', '\ud83d\udd25', '\u26a1', '\ud83c\udf1f', '\ud83c\udfc6', '\ud83d\ude80', '\ud83c\udf89'];
-    for (let i = 0; i < 40; i++) {
+    // Swoosh trail particles — streak horizontally
+    const emojis = ['\ud83c\udfc3', '\ud83d\udca8', '\u26a1', '\ud83d\udd25', '\ud83c\udf1f', '\u2728'];
+    for (let i = 0; i < 18; i++) {
       const p = document.createElement('div');
-      p.className = 'starburst';
+      p.className = 'swoosh';
       p.textContent = emojis[Math.floor(Math.random() * emojis.length)];
-      const angle = (Math.PI * 2 * i) / 40 + (Math.random() - 0.5) * 0.3;
-      const dist = 120 + Math.random() * 200;
-      const tx = Math.cos(angle) * dist;
-      const ty = Math.sin(angle) * dist;
-      p.style.setProperty('--tx', tx + 'px');
-      p.style.setProperty('--ty', ty + 'px');
-      p.style.animationDelay = Math.random() * 0.3 + 's';
-      p.style.animationDuration = (0.8 + Math.random() * 0.6) + 's';
-      p.style.fontSize = (16 + Math.random() * 16) + 'px';
+      const yOffset = (Math.random() - 0.5) * 180;
+      p.style.setProperty('--y-offset', yOffset + 'px');
+      p.style.animationDelay = (i * 0.06) + 's';
+      p.style.fontSize = (14 + Math.random() * 12) + 'px';
       overlay.appendChild(p);
     }
 
@@ -949,7 +1078,151 @@
     setTimeout(() => {
       overlay.classList.add('celebrate-fade');
       setTimeout(() => overlay.remove(), 500);
-    }, 2500);
+    }, 1800);
+  }
+
+  function checkMilestone(dailySets) {
+    // Find the highest milestone hit
+    let milestone = null;
+    for (let i = MILESTONES.length - 1; i >= 0; i--) {
+      if (dailySets >= MILESTONES[i].sets) { milestone = MILESTONES[i]; break; }
+    }
+    if (!milestone) return;
+    if (milestone.sets <= lastCelebratedMilestone) return;
+    lastCelebratedMilestone = milestone.sets;
+    celebrateMilestone(milestone);
+  }
+
+  function haptic(pattern) {
+    if (navigator.vibrate) navigator.vibrate(pattern);
+  }
+
+  function celebrateMilestone(ms) {
+    haptic(ms.vibrate);
+
+    const tierIndex = MILESTONES.indexOf(ms);
+    const overlay = document.createElement('div');
+    overlay.className = 'celebrate-overlay';
+
+    // Banner
+    const banner = document.createElement('div');
+    banner.className = 'celebrate-banner';
+    if (tierIndex >= 4) banner.classList.add('banner-glow');
+    if (tierIndex >= 5) banner.classList.add('banner-gold');
+    banner.textContent = `${ms.label} ${ms.emoji}`;
+    overlay.appendChild(banner);
+
+    // Particles — scale up with tier
+    const starEmojis = ['⭐', '💪', '🔥', '⚡', '🌟', '🏆', '🚀', '🎉', '✨', '💥'];
+    const colors = ['#4ade80', '#6c63ff', '#fbbf24', '#ff6b81', '#63b3ff', '#ce82ff', '#ff9f43', '#2ed573'];
+
+    if (tierIndex <= 1) {
+      // Small: just sparks popping up from bottom center
+      for (let i = 0; i < ms.particles; i++) {
+        const p = document.createElement('div');
+        p.className = 'spark';
+        p.textContent = starEmojis[Math.floor(Math.random() * starEmojis.length)];
+        const spread = (Math.random() - 0.5) * 200;
+        const rise = 80 + Math.random() * 120;
+        p.style.setProperty('--sx', spread + 'px');
+        p.style.setProperty('--sy', -rise + 'px');
+        p.style.animationDelay = Math.random() * 0.2 + 's';
+        p.style.fontSize = (12 + Math.random() * 10) + 'px';
+        overlay.appendChild(p);
+      }
+    } else if (tierIndex <= 3) {
+      // Medium: starburst from center
+      for (let i = 0; i < ms.particles; i++) {
+        const p = document.createElement('div');
+        p.className = 'starburst';
+        p.textContent = starEmojis[Math.floor(Math.random() * starEmojis.length)];
+        const angle = (Math.PI * 2 * i) / ms.particles + (Math.random() - 0.5) * 0.4;
+        const dist = 80 + Math.random() * 160;
+        p.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
+        p.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
+        p.style.animationDelay = Math.random() * 0.3 + 's';
+        p.style.animationDuration = (0.7 + Math.random() * 0.5) + 's';
+        p.style.fontSize = (14 + Math.random() * 14) + 'px';
+        overlay.appendChild(p);
+      }
+      // Screen shake for Beast Mode
+      if (tierIndex === 3) {
+        document.getElementById('app').classList.add('screen-shake');
+        setTimeout(() => document.getElementById('app').classList.remove('screen-shake'), 400);
+      }
+    } else {
+      // Big: confetti rain + starburst combined
+      const confettiCount = Math.floor(ms.particles * 0.5);
+      const burstCount = ms.particles - confettiCount;
+      const shapes = ['●', '■', '▲', '★', '◆'];
+      for (let i = 0; i < confettiCount; i++) {
+        const p = document.createElement('div');
+        p.className = 'confetti';
+        p.textContent = shapes[Math.floor(Math.random() * shapes.length)];
+        p.style.color = colors[Math.floor(Math.random() * colors.length)];
+        p.style.left = Math.random() * 100 + '%';
+        p.style.animationDelay = Math.random() * 0.5 + 's';
+        p.style.animationDuration = (1.5 + Math.random() * 1.5) + 's';
+        p.style.fontSize = (10 + Math.random() * 18) + 'px';
+        overlay.appendChild(p);
+      }
+      for (let i = 0; i < burstCount; i++) {
+        const p = document.createElement('div');
+        p.className = 'starburst';
+        p.textContent = starEmojis[Math.floor(Math.random() * starEmojis.length)];
+        const angle = (Math.PI * 2 * i) / burstCount + (Math.random() - 0.5) * 0.3;
+        const dist = 120 + Math.random() * 200;
+        p.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
+        p.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
+        p.style.animationDelay = Math.random() * 0.3 + 's';
+        p.style.animationDuration = (0.8 + Math.random() * 0.6) + 's';
+        p.style.fontSize = (16 + Math.random() * 16) + 'px';
+        overlay.appendChild(p);
+      }
+      // Screen shake for top tiers
+      document.getElementById('app').classList.add('screen-shake');
+      setTimeout(() => document.getElementById('app').classList.remove('screen-shake'), 500);
+    }
+
+    document.getElementById('app').appendChild(overlay);
+
+    setTimeout(() => {
+      overlay.classList.add('celebrate-fade');
+      setTimeout(() => overlay.remove(), 500);
+    }, ms.duration);
+  }
+
+  // ===== Streak Badge =====
+  function initStreakBadge() {
+    const badge = document.createElement('div');
+    badge.id = 'streak-badge';
+    badge.className = 'streak-badge hidden';
+    badge.innerHTML = '<span class="streak-count"></span><span class="streak-flame">🔥</span>';
+    document.getElementById('header').appendChild(badge);
+    // Init on load
+    const currentSets = getDailySetCount();
+    if (currentSets > 0) updateStreakBadge(currentSets);
+  }
+
+  function updateStreakBadge(sets) {
+    const badge = document.getElementById('streak-badge');
+    if (!badge) return;
+    if (sets <= 0) { badge.classList.add('hidden'); return; }
+
+    badge.classList.remove('hidden');
+    badge.querySelector('.streak-count').textContent = sets;
+
+    // Color tier based on milestones
+    let tier = 0;
+    for (let i = 0; i < MILESTONES.length; i++) {
+      if (sets >= MILESTONES[i].sets) tier = i + 1;
+    }
+    badge.dataset.tier = tier;
+
+    // Bounce animation
+    badge.classList.remove('streak-bump');
+    void badge.offsetWidth; // force reflow
+    badge.classList.add('streak-bump');
   }
 
   // ===== History Modal =====
@@ -1104,6 +1377,7 @@
     }
 
     // Animate departing rows
+    card.classList.add('card-compact');
     outRows.forEach(row => {
       row.style.transition = 'opacity 0.25s ease, max-height 0.3s ease, padding 0.3s ease';
       row.style.opacity = '0';
@@ -1114,7 +1388,6 @@
     // After animation, render the selected state
     setTimeout(() => {
       activeGroup = groupKey;
-      card.classList.add('card-compact');
       renderExercises();
       renderSummary();
 
@@ -1153,6 +1426,18 @@
   // ===== Init =====
   function init() {
     initModal();
+    initStreakBadge();
+    // Set milestone baseline so page load doesn't re-trigger celebrations
+    const initSets = getDailySetCount();
+    for (let i = MILESTONES.length - 1; i >= 0; i--) {
+      if (initSets >= MILESTONES[i].sets) { lastCelebratedMilestone = MILESTONES[i].sets; break; }
+    }
+    // Mark groups that already hit their goal
+    for (const key of Object.keys(MUSCLE_GROUPS)) {
+      const vol = getGroupVolume14Days(key);
+      const target = getTarget(key);
+      if (target > 0 && vol >= target) celebratedGoals.add(key);
+    }
     renderDate();
     renderSummary();
 
@@ -1423,20 +1708,23 @@
     {
       target: '#summary',
       title: '14-Day Volume',
-      text: 'Your sets per muscle group over 14 days.',
+      text: 'Each bar tracks your sets over the last 14 days, colored by muscle group.',
       position: 'below',
     },
     {
-      target: '.summary-row',
-      title: 'Bar Colors',
-      text: 'Green = recent, yellow = older, red = expiring soon.',
+      target: '.summary-row.focus-glow',
+      title: 'Focus Recommendations',
+      text: '🎯 and a glowing border highlight the groups that need your attention most.',
       position: 'below',
+      fallback: true,
+      fallbackTarget: '.summary-row',
     },
     {
       target: '.summary-row',
       title: 'Select a Group',
       text: 'Tap a muscle group to see its exercises.',
       position: 'below',
+      action: 'openGroup',
     },
     {
       target: '.target-stepper-row',
@@ -1467,6 +1755,20 @@
       fallback: true,
     },
     {
+      target: '.exercise-card',
+      title: 'Swipe to Delete',
+      text: 'Swipe an exercise left to delete or clear it.',
+      position: 'above',
+      fallback: true,
+    },
+    {
+      target: '.exercise-card',
+      title: 'Edit Exercise',
+      text: 'Long-press any exercise to change its name or emoji.',
+      position: 'above',
+      fallback: true,
+    },
+    {
       target: '.exercise-card-add',
       title: 'Custom Exercises',
       text: 'Add your own exercises to any group.',
@@ -1491,9 +1793,12 @@
   let tutorialOverlay = null;
 
   function startTutorial() {
-    // Ensure a group is selected so exercise cards are visible for later steps
-    if (!activeGroup) {
-      switchToGroup('back');
+    // Start from overview — deselect any active group
+    if (activeGroup) {
+      activeGroup = null;
+      document.getElementById('summary').classList.remove('card-compact');
+      renderSummary();
+      document.getElementById('exercises').innerHTML = '';
     }
     tutorialStep = 0;
     showTutorialStep();
@@ -1502,10 +1807,26 @@
   function showTutorialStep() {
     // Clean up previous overlay
     if (tutorialOverlay) tutorialOverlay.remove();
-    if (tutorialStep >= TUTORIAL_STEPS.length) return;
+    if (tutorialStep >= TUTORIAL_STEPS.length) {
+      endTutorial();
+      return;
+    }
 
     const step = TUTORIAL_STEPS[tutorialStep];
+    // Action: open a group for exercise-related steps
+    if (step.action === 'openGroup' && !activeGroup) {
+      activeGroup = 'back';
+      document.getElementById('summary').classList.add('card-compact');
+      renderSummary();
+      renderExercises();
+    }
+
     let targetEl = document.querySelector(step.target);
+
+    // Try fallback selector if primary doesn't exist
+    if (!targetEl && step.fallbackTarget) {
+      targetEl = document.querySelector(step.fallbackTarget);
+    }
 
     // If target doesn't exist (e.g. no exercises rendered), skip
     if (!targetEl && step.fallback) {
@@ -1627,5 +1948,12 @@
       tutorialOverlay = null;
     }
     tutorialStep = 0;
+    // Return to initial state — deselect group, show overview
+    if (activeGroup) {
+      activeGroup = null;
+      document.getElementById('summary').classList.remove('card-compact');
+      renderSummary();
+      document.getElementById('exercises').innerHTML = '';
+    }
   }
 })();

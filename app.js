@@ -74,8 +74,8 @@
     },
   };
 
-  // ===== State =====
-  // Precompute exercise → group lookup
+  // ===== Lookup Maps =====
+  // Precompute exercise → group lookup for fast group identification
   const EXERCISE_GROUP_MAP = {};
   for (const [key, group] of Object.entries(MUSCLE_GROUPS)) {
     for (const ex of group.exercises) {
@@ -83,6 +83,17 @@
     }
   }
 
+  // Color per muscle group — used in summary bars and celebration effects
+  const GROUP_COLORS = {
+    back: '#63b3ff',
+    shoulders: '#ff9f43',
+    chest: '#ff6b81',
+    legs: '#2ed573',
+    arms: '#ce82ff',
+    cardio: '#ffea64',
+  };
+
+  // ===== State =====
   let data = loadData();
   // Ensure customExercises exists for older data
   if (!data.customExercises) data.customExercises = {};
@@ -98,8 +109,6 @@
   if (!data.hiddenExercises) data.hiddenExercises = {};
 
   let activeGroup = null;
-  let undoTimeout = null;
-  let lastAction = null;
   let pushWindow = null; // { exerciseId, ts, timer }
   let lastCelebratedMilestone = 0; // track highest milestone celebrated this session
   let cardioCelebratedToday = false;
@@ -108,15 +117,21 @@
 
   // Milestone tiers for non-cardio daily sets
   const MILESTONES = [
-    { sets: 3,  label: 'Warming Up', emoji: '🔥', particles: 8,  duration: 1200, vibrate: [50] },
-    { sets: 6,  label: 'Getting Strong', emoji: '💪', particles: 15, duration: 1600, vibrate: [50, 30, 50] },
-    { sets: 9,  label: 'On Fire', emoji: '🔥🔥', particles: 22, duration: 1800, vibrate: [50, 30, 80] },
-    { sets: 12, label: 'Beast Mode', emoji: '⚡', particles: 32, duration: 2200, vibrate: [60, 40, 60, 40, 100] },
-    { sets: 15, label: 'Unstoppable', emoji: '🚀', particles: 45, duration: 2600, vibrate: [80, 50, 80, 50, 150] },
-    { sets: 18, label: 'Legend', emoji: '🏆', particles: 65, duration: 3000, vibrate: [100, 60, 100, 60, 200] },
+    { sets: 3,  label: 'Warming Up', emoji: '🔥', particles: 14,  duration: 1500, vibrate: [50] },
+    { sets: 6,  label: 'Getting Strong', emoji: '💪', particles: 24, duration: 2000, vibrate: [50, 30, 50] },
+    { sets: 9,  label: 'On Fire', emoji: '🔥🔥', particles: 36, duration: 2400, vibrate: [50, 30, 80] },
+    { sets: 12, label: 'Beast Mode', emoji: '⚡', particles: 50, duration: 2800, vibrate: [60, 40, 60, 40, 100] },
+    { sets: 15, label: 'Unstoppable', emoji: '🚀', particles: 70, duration: 3200, vibrate: [80, 50, 80, 50, 150] },
+    { sets: 18, label: 'Legend', emoji: '🏆', particles: 95, duration: 3600, vibrate: [100, 60, 100, 60, 200] },
   ];
 
-  // ===== Persistence =====
+  // ===== Persistence (localStorage) =====
+  // Data schema:
+  //   logs:              { [exerciseId]: [ { date, ts?, push? }, ... ] }
+  //   targets:           { [groupKey]: number }
+  //   customExercises:   { [groupKey]: [ { id, name, icon, dots } ] }
+  //   exerciseOverrides: { [exerciseId]: { name, icon } }
+  //   hiddenExercises:   { [groupKey]: [ exerciseId, ... ] }
   function loadData() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -125,11 +140,6 @@
       console.error('Failed to load data', e);
     }
     return { logs: {}, targets: {}, customExercises: {}, exerciseOverrides: {}, hiddenExercises: {} };
-    // logs: { [exerciseId]: [ { date: "YYYY-MM-DD" }, ... ] }
-    // targets: { [groupKey]: number }
-    // customExercises: { [groupKey]: [ { id, name, icon, dots } ] }
-    // exerciseOverrides: { [exerciseId]: { name, icon } }
-    // hiddenExercises: { [groupKey]: [ exerciseId, ... ] }
   }
 
   function saveData() {
@@ -181,6 +191,7 @@
   }
 
   // ===== Data Queries =====
+  // All logs for an exercise, sorted newest-first
   function getExerciseLogs(exerciseId) {
     return (data.logs[exerciseId] || []).sort((a, b) => b.date.localeCompare(a.date));
   }
@@ -188,31 +199,6 @@
   function getTodayLogs(exerciseId) {
     const today = todayStr();
     return (data.logs[exerciseId] || []).filter(l => l.date === today);
-  }
-
-  function getPushStats(exerciseId) {
-    const today = todayStr();
-    const logs = data.logs[exerciseId] || [];
-    // Group by date, only last 30 days
-    const byDate = {};
-    for (const l of logs) {
-      if (daysBetween(l.date, today) <= 30) {
-        if (!byDate[l.date]) byDate[l.date] = [];
-        byDate[l.date].push(l);
-      }
-    }
-    const dates = Object.keys(byDate).sort().reverse();
-    let pushSessions = 0;
-    let totalSessions = dates.length;
-    let streak = 0;
-    let streakBroken = false;
-    for (const date of dates) {
-      const hasPush = byDate[date].some(l => l.push);
-      if (hasPush) pushSessions++;
-      if (!streakBroken && hasPush) streak++;
-      else streakBroken = true;
-    }
-    return { pushSessions, totalSessions, streak };
   }
 
   function getLastDate(exerciseId) {
@@ -225,6 +211,7 @@
     return total;
   }
 
+  // Volume and freshness buckets for a group within the 14-day window
   function getGroupStats14Days(groupKey) {
     const exercises = getGroupExercises(groupKey);
     const today = todayStr();
@@ -249,7 +236,8 @@
     return { total, pushed, buckets };
   }
 
-  // Priority scoring: higher = more recommended to train
+  // Priority scoring: higher score = more recommended to train next.
+  // Factors: volume deficit vs goal, sets about to expire, recency.
   function getGroupPriorities() {
     const today = todayStr();
     const scores = {};
@@ -287,6 +275,7 @@
     return scores;
   }
 
+  // Count non-cardio sets logged today (for milestone tracking)
   function getDailySetCount() {
     const today = todayStr();
     const cardioIds = new Set(MUSCLE_GROUPS.cardio.exercises.map(e => e.id));
@@ -298,6 +287,7 @@
     return count;
   }
 
+  // Count distinct cardio exercises logged today
   function getDailyCardioCount() {
     const today = todayStr();
     const cardioIds = MUSCLE_GROUPS.cardio.exercises.map(e => e.id);
@@ -308,7 +298,7 @@
     return count;
   }
 
-  // ===== Actions =====
+  // ===== Actions (log, undo, push sets) =====
   function logExercise(exerciseId) {
     if (!data.logs[exerciseId]) data.logs[exerciseId] = [];
 
@@ -344,8 +334,6 @@
     if (pushWindow) clearTimeout(pushWindow.timer);
     pushWindow = { exerciseId, ts: entry.ts, timer: setTimeout(clearPushWindow, 3000) };
 
-    lastAction = { exerciseId, entry };
-    showUndo(exerciseId);
     renderAll();
   }
 
@@ -356,6 +344,7 @@
       if (logs[i].date === today) {
         logs.splice(i, 1);
         saveData();
+        updateStreakBadge(getDailySetCount());
         renderAll();
         showToast('-1 set');
         return;
@@ -497,16 +486,18 @@
       delete data.exerciseOverrides[exerciseId];
       saveData();
     }
+    updateStreakBadge(getDailySetCount());
     showToast(`Deleted ${name}`);
     renderAll();
   }
 
   // ===== Rendering =====
-  let skipAnimation = false;
+  let skipAnimation = false; // Suppress card entrance animations during bulk re-renders
 
   function renderAll() {
     renderDate();
     renderSummary();
+    // Skip entrance animations when re-rendering after data changes
     skipAnimation = true;
     renderExercises();
     skipAnimation = false;
@@ -520,6 +511,7 @@
     });
   }
 
+  // User-customizable 14-day volume target per group
   function getTarget(groupKey) {
     if (data.targets && data.targets[groupKey] != null) return data.targets[groupKey];
     return MUSCLE_GROUPS[groupKey].target;
@@ -745,6 +737,7 @@
     animateCardIn(addCard, activeGroup, idx);
   }
 
+  // Per-group card entrance animations — each group has a unique style
   const GROUP_ANIMATIONS = {
     back: (card, i) => {
       // Cascade down
@@ -815,7 +808,7 @@
     if (anim) anim(card, index);
   }
 
-  // ===== Add Custom Exercise =====
+  // ===== Exercise Management (custom, edit, hide) =====
   function promptEditExercise(exerciseId, groupKey) {
     const ex = findExercise(exerciseId);
     if (!ex) return;
@@ -937,48 +930,7 @@
     });
   }
 
-  // ===== Celebration =====
-  const GROUP_COLORS = {
-    back: '#63b3ff',
-    shoulders: '#ff9f43',
-    chest: '#ff6b81',
-    legs: '#2ed573',
-    arms: '#ce82ff',
-    cardio: '#ffea64',
-  };
-
-  function celebrate(message) {
-    const overlay = document.createElement('div');
-    overlay.className = 'celebrate-overlay';
-
-    // Banner text
-    const banner = document.createElement('div');
-    banner.className = 'celebrate-banner';
-    banner.textContent = message;
-    overlay.appendChild(banner);
-
-    // Confetti particles
-    const colors = ['#4ade80', '#6c63ff', '#fbbf24', '#ff6b81', '#63b3ff', '#ce82ff', '#ff9f43', '#2ed573'];
-    const shapes = ['\u25cf', '\u25a0', '\u25b2', '\u2605', '\u25c6'];
-    for (let i = 0; i < 60; i++) {
-      const particle = document.createElement('div');
-      particle.className = 'confetti';
-      particle.textContent = shapes[Math.floor(Math.random() * shapes.length)];
-      particle.style.color = colors[Math.floor(Math.random() * colors.length)];
-      particle.style.left = Math.random() * 100 + '%';
-      particle.style.animationDelay = Math.random() * 0.5 + 's';
-      particle.style.animationDuration = (1.5 + Math.random() * 1.5) + 's';
-      particle.style.fontSize = (10 + Math.random() * 18) + 'px';
-      overlay.appendChild(particle);
-    }
-
-    document.getElementById('app').appendChild(overlay);
-
-    setTimeout(() => {
-      overlay.classList.add('celebrate-fade');
-      setTimeout(() => overlay.remove(), 500);
-    }, 2200);
-  }
+  // ===== Celebrations (milestones, group goals, cardio) =====
 
   function celebrateGroupGoal(groupKey) {
     haptic([100, 60, 100, 60, 200]);
@@ -1003,49 +955,44 @@
 
     // Group-colored starburst particles
     const emojis = ['\u2b50', '\u2728', '\ud83c\udf1f', '\u26a1', group.icon, '\ud83c\udfc6'];
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 60; i++) {
       const p = document.createElement('div');
       p.className = 'starburst';
       p.textContent = emojis[Math.floor(Math.random() * emojis.length)];
-      const angle = (Math.PI * 2 * i) / 40 + (Math.random() - 0.5) * 0.3;
-      const dist = 100 + Math.random() * 220;
+      const angle = (Math.PI * 2 * i) / 60 + (Math.random() - 0.5) * 0.4;
+      const dist = 140 + Math.random() * 300;
       p.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
       p.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
-      p.style.animationDelay = Math.random() * 0.3 + 's';
-      p.style.animationDuration = (0.8 + Math.random() * 0.6) + 's';
-      p.style.fontSize = (16 + Math.random() * 18) + 'px';
+      p.style.animationDelay = Math.random() * 0.4 + 's';
+      p.style.animationDuration = (0.9 + Math.random() * 0.7) + 's';
+      p.style.fontSize = (20 + Math.random() * 22) + 'px';
       overlay.appendChild(p);
     }
 
     // Group-colored confetti rain
     const shapes = ['\u25cf', '\u25a0', '\u2605', '\u25c6'];
-    for (let i = 0; i < 35; i++) {
+    for (let i = 0; i < 50; i++) {
       const p = document.createElement('div');
       p.className = 'confetti';
       p.textContent = shapes[Math.floor(Math.random() * shapes.length)];
       p.style.color = color;
       p.style.left = Math.random() * 100 + '%';
-      p.style.animationDelay = Math.random() * 0.6 + 's';
-      p.style.animationDuration = (1.5 + Math.random() * 1.5) + 's';
-      p.style.fontSize = (10 + Math.random() * 16) + 'px';
+      p.style.animationDelay = Math.random() * 0.8 + 's';
+      p.style.animationDuration = (1.8 + Math.random() * 1.8) + 's';
+      p.style.fontSize = (14 + Math.random() * 20) + 'px';
       overlay.appendChild(p);
     }
 
     // Screen shake
     document.getElementById('app').classList.add('screen-shake');
-    setTimeout(() => document.getElementById('app').classList.remove('screen-shake'), 500);
+    setTimeout(() => document.getElementById('app').classList.remove('screen-shake'), 600);
 
     document.getElementById('app').appendChild(overlay);
 
     setTimeout(() => {
       overlay.classList.add('celebrate-fade');
       setTimeout(() => overlay.remove(), 500);
-    }, 3200);
-  }
-
-  function celebrateDaily() {
-    // Legacy — no longer called, kept as fallback
-    celebrateMilestone(MILESTONES[MILESTONES.length - 1]);
+    }, 3800);
   }
 
   function celebrateCardio() {
@@ -1062,14 +1009,14 @@
 
     // Swoosh trail particles — streak horizontally
     const emojis = ['\ud83c\udfc3', '\ud83d\udca8', '\u26a1', '\ud83d\udd25', '\ud83c\udf1f', '\u2728'];
-    for (let i = 0; i < 18; i++) {
+    for (let i = 0; i < 28; i++) {
       const p = document.createElement('div');
       p.className = 'swoosh';
       p.textContent = emojis[Math.floor(Math.random() * emojis.length)];
-      const yOffset = (Math.random() - 0.5) * 180;
+      const yOffset = (Math.random() - 0.5) * 280;
       p.style.setProperty('--y-offset', yOffset + 'px');
-      p.style.animationDelay = (i * 0.06) + 's';
-      p.style.fontSize = (14 + Math.random() * 12) + 'px';
+      p.style.animationDelay = (i * 0.05) + 's';
+      p.style.fontSize = (18 + Math.random() * 16) + 'px';
       overlay.appendChild(p);
     }
 
@@ -1078,7 +1025,7 @@
     setTimeout(() => {
       overlay.classList.add('celebrate-fade');
       setTimeout(() => overlay.remove(), 500);
-    }, 1800);
+    }, 2400);
   }
 
   function checkMilestone(dailySets) {
@@ -1094,7 +1041,16 @@
   }
 
   function haptic(pattern) {
-    if (navigator.vibrate) navigator.vibrate(pattern);
+    if (navigator.vibrate) {
+      navigator.vibrate(pattern);
+    } else {
+      // iOS Safari doesn't support vibrate — flash the screen as tactile substitute
+      const flash = document.createElement('div');
+      flash.style.cssText = 'position:fixed;inset:0;background:rgba(255,255,255,0.12);z-index:9999;pointer-events:none;transition:opacity 0.15s';
+      document.body.appendChild(flash);
+      requestAnimationFrame(() => { flash.style.opacity = '0'; });
+      setTimeout(() => flash.remove(), 200);
+    }
   }
 
   function celebrateMilestone(ms) {
@@ -1117,17 +1073,17 @@
     const colors = ['#4ade80', '#6c63ff', '#fbbf24', '#ff6b81', '#63b3ff', '#ce82ff', '#ff9f43', '#2ed573'];
 
     if (tierIndex <= 1) {
-      // Small: just sparks popping up from bottom center
+      // Small: sparks popping up from bottom center
       for (let i = 0; i < ms.particles; i++) {
         const p = document.createElement('div');
         p.className = 'spark';
         p.textContent = starEmojis[Math.floor(Math.random() * starEmojis.length)];
-        const spread = (Math.random() - 0.5) * 200;
-        const rise = 80 + Math.random() * 120;
+        const spread = (Math.random() - 0.5) * 340;
+        const rise = 120 + Math.random() * 200;
         p.style.setProperty('--sx', spread + 'px');
         p.style.setProperty('--sy', -rise + 'px');
-        p.style.animationDelay = Math.random() * 0.2 + 's';
-        p.style.fontSize = (12 + Math.random() * 10) + 'px';
+        p.style.animationDelay = Math.random() * 0.3 + 's';
+        p.style.fontSize = (16 + Math.random() * 14) + 'px';
         overlay.appendChild(p);
       }
     } else if (tierIndex <= 3) {
@@ -1136,19 +1092,19 @@
         const p = document.createElement('div');
         p.className = 'starburst';
         p.textContent = starEmojis[Math.floor(Math.random() * starEmojis.length)];
-        const angle = (Math.PI * 2 * i) / ms.particles + (Math.random() - 0.5) * 0.4;
-        const dist = 80 + Math.random() * 160;
+        const angle = (Math.PI * 2 * i) / ms.particles + (Math.random() - 0.5) * 0.5;
+        const dist = 120 + Math.random() * 260;
         p.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
         p.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
-        p.style.animationDelay = Math.random() * 0.3 + 's';
-        p.style.animationDuration = (0.7 + Math.random() * 0.5) + 's';
-        p.style.fontSize = (14 + Math.random() * 14) + 'px';
+        p.style.animationDelay = Math.random() * 0.4 + 's';
+        p.style.animationDuration = (0.8 + Math.random() * 0.7) + 's';
+        p.style.fontSize = (18 + Math.random() * 18) + 'px';
         overlay.appendChild(p);
       }
       // Screen shake for Beast Mode
       if (tierIndex === 3) {
         document.getElementById('app').classList.add('screen-shake');
-        setTimeout(() => document.getElementById('app').classList.remove('screen-shake'), 400);
+        setTimeout(() => document.getElementById('app').classList.remove('screen-shake'), 500);
       }
     } else {
       // Big: confetti rain + starburst combined
@@ -1161,27 +1117,27 @@
         p.textContent = shapes[Math.floor(Math.random() * shapes.length)];
         p.style.color = colors[Math.floor(Math.random() * colors.length)];
         p.style.left = Math.random() * 100 + '%';
-        p.style.animationDelay = Math.random() * 0.5 + 's';
-        p.style.animationDuration = (1.5 + Math.random() * 1.5) + 's';
-        p.style.fontSize = (10 + Math.random() * 18) + 'px';
+        p.style.animationDelay = Math.random() * 0.7 + 's';
+        p.style.animationDuration = (1.8 + Math.random() * 1.8) + 's';
+        p.style.fontSize = (14 + Math.random() * 22) + 'px';
         overlay.appendChild(p);
       }
       for (let i = 0; i < burstCount; i++) {
         const p = document.createElement('div');
         p.className = 'starburst';
         p.textContent = starEmojis[Math.floor(Math.random() * starEmojis.length)];
-        const angle = (Math.PI * 2 * i) / burstCount + (Math.random() - 0.5) * 0.3;
-        const dist = 120 + Math.random() * 200;
+        const angle = (Math.PI * 2 * i) / burstCount + (Math.random() - 0.5) * 0.4;
+        const dist = 160 + Math.random() * 280;
         p.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
         p.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
-        p.style.animationDelay = Math.random() * 0.3 + 's';
-        p.style.animationDuration = (0.8 + Math.random() * 0.6) + 's';
-        p.style.fontSize = (16 + Math.random() * 16) + 'px';
+        p.style.animationDelay = Math.random() * 0.4 + 's';
+        p.style.animationDuration = (0.9 + Math.random() * 0.7) + 's';
+        p.style.fontSize = (20 + Math.random() * 20) + 'px';
         overlay.appendChild(p);
       }
       // Screen shake for top tiers
       document.getElementById('app').classList.add('screen-shake');
-      setTimeout(() => document.getElementById('app').classList.remove('screen-shake'), 500);
+      setTimeout(() => document.getElementById('app').classList.remove('screen-shake'), 600);
     }
 
     document.getElementById('app').appendChild(overlay);
@@ -1197,7 +1153,7 @@
     const badge = document.createElement('div');
     badge.id = 'streak-badge';
     badge.className = 'streak-badge hidden';
-    badge.innerHTML = '<span class="streak-count"></span><span class="streak-flame">🔥</span>';
+    badge.innerHTML = '<span class="streak-count"></span><span class="streak-flame">⚡</span>';
     document.getElementById('header').appendChild(badge);
     // Init on load
     const currentSets = getDailySetCount();
@@ -1225,78 +1181,16 @@
     badge.classList.add('streak-bump');
   }
 
-  // ===== History Modal =====
-  function openHistory(exercise) {
-    const modal = document.getElementById('modal');
-    const title = document.getElementById('modal-title');
-    const body = document.getElementById('modal-body');
-
-    title.textContent = exercise.name;
-
-    const logs = getExerciseLogs(exercise.id);
-    if (logs.length === 0) {
-      body.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:20px 0;">No history yet.</p>';
-    } else {
-      // Group by date
-      const byDate = {};
-      for (const log of logs) {
-        if (!byDate[log.date]) byDate[log.date] = [];
-        byDate[log.date].push(log);
-      }
-
-      let html = '';
-
-      // Push streak banner
-      const ps = getPushStats(exercise.id);
-      if (ps.streak > 1) {
-        html += `<div class="push-streak-banner">🔥 Pushed ${ps.streak} sessions in a row</div>`;
-      }
-
-      for (const [date, entries] of Object.entries(byDate)) {
-        const ago = daysAgo(date);
-        const pushCount = entries.filter(e => e.push).length;
-        const setsLabel = pushCount > 0
-          ? `${entries.length} sets (${pushCount} 🔥)`
-          : `${entries.length} sets`;
-        html += `
-          <div class="history-entry">
-            <div>
-              <div class="history-date">${formatDateNice(date)}</div>
-              <div class="history-ago ${freshnessClass(ago)}">${daysAgoLabel(ago)}</div>
-            </div>
-            <div style="text-align:right">
-              <div style="font-weight:600">${setsLabel}</div>
-            </div>
-          </div>
-        `;
-      }
-
-      html += `
-        <div class="modal-actions">
-          <button class="btn btn-danger" id="clear-history-btn">Clear All History</button>
-        </div>
-      `;
-
-      body.innerHTML = html;
-
-      document.getElementById('clear-history-btn').addEventListener('click', () => {
-        if (confirm(`Clear all history for ${exercise.name}?`)) {
-          data.logs[exercise.id] = [];
-          saveData();
-          closeModal();
-          renderAll();
-        }
-      });
-    }
-
-    modal.classList.remove('hidden');
-  }
-
+  // ===== Modal =====
   function closeModal() {
     document.getElementById('modal').classList.add('hidden');
   }
 
-  // ===== Toast / Undo =====
+  function initModal() {
+    document.getElementById('modal-close').addEventListener('click', closeModal);
+    document.querySelector('.modal-backdrop').addEventListener('click', closeModal);
+  }
+  // ===== UI Feedback =====
   function showToast(msg) {
     const el = document.getElementById('toast');
     el.textContent = msg;
@@ -1305,33 +1199,14 @@
     el._timer = setTimeout(() => el.classList.add('hidden'), 1500);
   }
 
-  function showUndo(exerciseId) {
-    // Remove existing undo bar
-    hideUndo();
-    const bar = document.createElement('div');
-    bar.className = 'undo-bar';
-    bar.id = 'undo-bar';
-    bar.innerHTML = `
-      <span>Tap dots to undo</span>
-    `;
-    document.getElementById('app').appendChild(bar);
-
-    undoTimeout = setTimeout(hideUndo, 5000);
-  }
-
-  function hideUndo() {
-    clearTimeout(undoTimeout);
-    const bar = document.getElementById('undo-bar');
-    if (bar) bar.remove();
-  }
-
-  // ===== Security: Sanitize =====
+  // ===== Security =====
+  // Sanitize user-provided strings before inserting into the DOM
   function sanitize(str) {
     _sanitizeEl.textContent = str;
     return _sanitizeEl.innerHTML;
   }
 
-  // ===== Tab Navigation =====
+  // ===== Group Navigation & Animations =====
   function switchToGroup(groupKey) {
     const card = document.getElementById('summary');
     const container = document.getElementById('summary-bars');
@@ -1417,16 +1292,11 @@
     setTimeout(() => { container.innerHTML = ''; }, 250);
   }
 
-  // ===== Modal Close =====
-  function initModal() {
-    document.getElementById('modal-close').addEventListener('click', closeModal);
-    document.querySelector('.modal-backdrop').addEventListener('click', closeModal);
-  }
-
   // ===== Init =====
   function init() {
     initModal();
     initStreakBadge();
+
     // Set milestone baseline so page load doesn't re-trigger celebrations
     const initSets = getDailySetCount();
     for (let i = MILESTONES.length - 1; i >= 0; i--) {
@@ -1438,6 +1308,8 @@
       const target = getTarget(key);
       if (target > 0 && vol >= target) celebratedGoals.add(key);
     }
+    // Suppress duplicate cardio celebration if already logged today
+    cardioCelebratedToday = getDailyCardioCount() > 0;
     renderDate();
     renderSummary();
 
@@ -1492,7 +1364,7 @@
     document.getElementById('import-file-input').addEventListener('change', importData);
     document.getElementById('clear-all-btn').addEventListener('click', () => {
       if (confirm('Delete ALL workout data? This cannot be undone.')) {
-        data = { logs: {}, targets: {}, customExercises: {} };
+        data = { logs: {}, targets: {}, customExercises: {}, exerciseOverrides: {}, hiddenExercises: {} };
         saveData();
         closeModal();
         renderAll();
@@ -1566,6 +1438,8 @@
           data = imported;
           if (!data.targets) data.targets = {};
           if (!data.customExercises) data.customExercises = {};
+          if (!data.exerciseOverrides) data.exerciseOverrides = {};
+          if (!data.hiddenExercises) data.hiddenExercises = {};
           // Re-register custom exercises in lookup map
           for (const [key, exercises] of Object.entries(data.customExercises)) {
             for (const ex of exercises) {

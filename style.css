@@ -319,11 +319,11 @@ body {
   overflow: hidden;
 }
 
-.exercise-card .swipe-inner {
+.exercise-card .card-inner {
   padding: 18px;
 }
 
-.exercise-card:not(.swipe-open) .swipe-inner:active {
+.exercise-card .card-inner:active {
   transform: scale(0.97);
 }
 
@@ -1087,8 +1087,8 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ===== Swipe-to-delete ===== */
-.swipe-inner {
+/* ===== Card Inner =====  */
+.card-inner {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -1098,31 +1098,105 @@ body {
   z-index: 1;
   background: var(--surface);
   border-radius: var(--radius);
-  will-change: transform;
 }
 
-.swipe-delete-btn {
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 70px;
-  border: none;
-  background: #ef4444;
-  color: #fff;
-  font-weight: 700;
-  font-size: 0.85rem;
-  cursor: pointer;
-  border-radius: 0 var(--radius) var(--radius) 0;
-  z-index: 0;
+/* ===== PR Badge ===== */
+.pr-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+/* ===== Options Menu ===== */
+.options-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.options-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--bg);
+  border: 2px solid var(--surface2);
+  border-radius: 12px;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
   -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, border-color 0.15s;
 }
 
-.swipe-delete-btn:active {
-  background: #dc2626;
+.options-btn:active {
+  background: var(--surface2);
+}
+
+.options-btn-danger {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.options-btn-danger:active {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.options-btn-danger .options-label {
+  color: #ef4444;
+}
+
+.options-icon {
+  font-size: 1.3rem;
+  flex-shrink: 0;
+  width: 28px;
+  text-align: center;
+}
+
+.options-label {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.options-desc {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+/* ===== PR History ===== */
+.pr-history {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--surface2);
+}
+
+.pr-history-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.pr-history-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.pr-history-date {
+  color: var(--text-dim);
+  font-size: 0.8rem;
 }
 
 /* ===== Edit Exercise Modal ===== */

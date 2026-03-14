@@ -132,6 +132,7 @@
   //   customExercises:   { [groupKey]: [ { id, name, icon, dots } ] }
   //   exerciseOverrides: { [exerciseId]: { name, icon } }
   //   hiddenExercises:   { [groupKey]: [ exerciseId, ... ] }
+  //   personalRecords:   { [exerciseId]: { value: string, unit: string, date: string, history: [ { value, unit, date } ] } }
   function loadData() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -139,7 +140,7 @@
     } catch (e) {
       console.error('Failed to load data', e);
     }
-    return { logs: {}, targets: {}, customExercises: {}, exerciseOverrides: {}, hiddenExercises: {} };
+    return { logs: {}, targets: {}, customExercises: {}, exerciseOverrides: {}, hiddenExercises: {}, personalRecords: {} };
   }
 
   function saveData() {
@@ -420,63 +421,12 @@
     saveData();
   }
 
-  // ===== Swipe-to-delete =====
-  const SWIPE_THRESHOLD = 70;
-
-  function setupSwipe(card) {
-    const inner = card.querySelector('.swipe-inner');
-    let startX = 0, currentX = 0, swiping = false, opened = false;
-
-    inner.addEventListener('touchstart', (e) => {
-      startX = e.touches[0].clientX;
-      currentX = 0;
-      swiping = true;
-      inner.style.transition = 'none';
-    }, { passive: true });
-
-    inner.addEventListener('touchmove', (e) => {
-      if (!swiping) return;
-      const dx = e.touches[0].clientX - startX;
-      // Allow only leftward swipe (negative), or rightward to close
-      if (opened) {
-        currentX = Math.min(0, Math.max(-SWIPE_THRESHOLD, dx - SWIPE_THRESHOLD));
-      } else {
-        currentX = Math.min(0, dx);
-      }
-      inner.style.transform = `translateX(${currentX}px)`;
-      // Prevent vertical scroll while swiping horizontally
-      if (Math.abs(dx) > 10) e.preventDefault();
-    }, { passive: false });
-
-    inner.addEventListener('touchend', () => {
-      swiping = false;
-      inner.style.transition = 'transform 0.25s ease';
-      if (currentX < -SWIPE_THRESHOLD / 2) {
-        inner.style.transform = `translateX(-${SWIPE_THRESHOLD}px)`;
-        opened = true;
-        card.classList.add('swipe-open');
-      } else {
-        inner.style.transform = 'translateX(0)';
-        opened = false;
-        card.classList.remove('swipe-open');
-      }
-    }, { passive: true });
-
-    card._closeSwipe = () => {
-      inner.style.transition = 'transform 0.25s ease';
-      inner.style.transform = 'translateX(0)';
-      opened = false;
-      card.classList.remove('swipe-open');
-    };
-  }
-
-  function closeAllSwipes(exceptCard) {
-    document.querySelectorAll('.exercise-card.swipe-open').forEach(c => {
-      if (c !== exceptCard && c._closeSwipe) c._closeSwipe();
-    });
-  }
-
-  function handleSwipeDelete(exerciseId, groupKey, isCustom, name) {
+  // ===== Exercise Delete =====
+  function deleteExercise(exerciseId, groupKey) {
+    const isCustom = exerciseId.startsWith('custom_');
+    const ex = findExercise(exerciseId);
+    const name = ex ? sanitize(ex.name) : exerciseId;
+    if (!confirm(`Delete ${name}? This cannot be undone.`)) return;
     if (isCustom) {
       removeCustomExercise(groupKey, exerciseId);
     } else {
@@ -659,48 +609,42 @@
         actionBtnHtml = `<button class="card-action-btn" data-exercise="${ex.id}" aria-label="Remove last set">−</button>`;
       }
 
+      // PR badge if one exists
+      const pr = data.personalRecords && data.personalRecords[ex.id];
+      const prBadgeHtml = pr ? `<span class="pr-badge">PR: ${sanitize(pr.value)}${pr.unit ? ' ' + sanitize(pr.unit) : ''}</span>` : '';
+
       card.innerHTML = `
-        <div class="swipe-inner">
+        <div class="card-inner">
           <div class="exercise-icon">${ex.icon}</div>
           <div class="exercise-info">
-            <div class="exercise-name">${sanitize(ex.name)}</div>
+            <div class="exercise-name">${sanitize(ex.name)}${prBadgeHtml}</div>
             <div class="exercise-meta">${metaHtml}</div>
           </div>
           <div class="exercise-sets">${dotsHtml}</div>
           ${actionBtnHtml}
         </div>
-        <button class="swipe-delete-btn" data-exercise="${ex.id}">Delete</button>
       `;
 
-      // Swipe-to-reveal-delete
-      setupSwipe(card);
-
-      // Long-press to edit
+      // Long-press to show options menu
       let longPressTimer = null;
       let longPressFired = false;
-      const inner = card.querySelector('.swipe-inner');
+      const inner = card.querySelector('.card-inner');
       inner.addEventListener('touchstart', (e) => {
         longPressFired = false;
         longPressTimer = setTimeout(() => {
           longPressFired = true;
-          promptEditExercise(ex.id, activeGroup);
+          showExerciseOptions(ex.id, activeGroup);
         }, 500);
       }, { passive: true });
       inner.addEventListener('touchend', () => { clearTimeout(longPressTimer); }, { passive: true });
       inner.addEventListener('touchmove', () => { clearTimeout(longPressTimer); }, { passive: true });
 
       // Tap on card body to log 1 set
-      card.querySelector('.swipe-inner').addEventListener('click', (e) => {
+      card.querySelector('.card-inner').addEventListener('click', (e) => {
         if (longPressFired) return;
         if (e.target.closest('.card-action-btn')) return;
         logExercise(ex.id);
         showToast(`+1 set ${sanitize(ex.name)}`);
-      });
-
-      // Tap delete button
-      card.querySelector('.swipe-delete-btn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        handleSwipeDelete(ex.id, activeGroup, isCustom, sanitize(ex.name));
       });
 
       // Tap action button: mark push if in push window, otherwise remove last set
@@ -715,11 +659,6 @@
           }
         });
       }
-
-      // Close any open swipe when tapping on another card
-      card.querySelector('.swipe-inner').addEventListener('touchstart', () => {
-        closeAllSwipes(card);
-      }, { passive: true });
 
       container.appendChild(card);
 
@@ -813,6 +752,130 @@
     if (skipAnimation) return;
     const anim = GROUP_ANIMATIONS[groupKey];
     if (anim) anim(card, index);
+  }
+
+  // ===== Exercise Options Menu =====
+  function showExerciseOptions(exerciseId, groupKey) {
+    const ex = findExercise(exerciseId);
+    if (!ex) return;
+    haptic([30]);
+
+    const modal = document.getElementById('modal');
+    const title = document.getElementById('modal-title');
+    const body = document.getElementById('modal-body');
+
+    const pr = data.personalRecords && data.personalRecords[exerciseId];
+    const prDisplay = pr ? `${sanitize(pr.value)}${pr.unit ? ' ' + sanitize(pr.unit) : ''}` : 'Not set';
+
+    title.textContent = `${ex.icon} ${sanitize(ex.name)}`;
+    body.innerHTML = `
+      <div class="options-menu">
+        <button class="options-btn" id="opt-edit">
+          <span class="options-icon">✏️</span>
+          <span class="options-label">Edit</span>
+          <span class="options-desc">Change name or emoji</span>
+        </button>
+        <button class="options-btn" id="opt-pr">
+          <span class="options-icon">🏅</span>
+          <span class="options-label">Personal Record</span>
+          <span class="options-desc">${prDisplay}</span>
+        </button>
+        <button class="options-btn options-btn-danger" id="opt-delete">
+          <span class="options-icon">🗑️</span>
+          <span class="options-label">Delete</span>
+          <span class="options-desc">Remove this exercise</span>
+        </button>
+      </div>
+    `;
+
+    modal.classList.remove('hidden');
+
+    document.getElementById('opt-edit').addEventListener('click', () => {
+      closeModal();
+      promptEditExercise(exerciseId, groupKey);
+    });
+
+    document.getElementById('opt-pr').addEventListener('click', () => {
+      closeModal();
+      promptSetPR(exerciseId);
+    });
+
+    document.getElementById('opt-delete').addEventListener('click', () => {
+      closeModal();
+      deleteExercise(exerciseId, groupKey);
+    });
+  }
+
+  function promptSetPR(exerciseId) {
+    const ex = findExercise(exerciseId);
+    if (!ex) return;
+
+    if (!data.personalRecords) data.personalRecords = {};
+    const current = data.personalRecords[exerciseId];
+
+    const modal = document.getElementById('modal');
+    const title = document.getElementById('modal-title');
+    const body = document.getElementById('modal-body');
+
+    // Build history list if there are previous PRs
+    let historyHtml = '';
+    if (current && current.history && current.history.length > 0) {
+      const items = current.history.map(h =>
+        `<div class="pr-history-item"><span>${sanitize(h.value)}${h.unit ? ' ' + sanitize(h.unit) : ''}</span><span class="pr-history-date">${h.date}</span></div>`
+      ).join('');
+      historyHtml = `<div class="pr-history"><div class="pr-history-title">PR History</div>${items}</div>`;
+    }
+
+    title.textContent = `🏅 PR — ${sanitize(ex.name)}`;
+    body.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;gap:10px">
+          <input type="text" id="pr-value" value="${current ? sanitize(current.value) : ''}" placeholder="e.g. 225"
+            style="background:var(--bg);border:2px solid var(--surface2);border-radius:10px;padding:12px 14px;color:var(--text);font-size:1rem;outline:none;flex:1;box-sizing:border-box;" />
+          <input type="text" id="pr-unit" value="${current ? sanitize(current.unit || '') : ''}" placeholder="lbs"
+            maxlength="10"
+            style="background:var(--bg);border:2px solid var(--surface2);border-radius:10px;padding:12px 14px;color:var(--text);font-size:1rem;outline:none;width:70px;box-sizing:border-box;" />
+        </div>
+        <button class="btn btn-primary" id="pr-save">Save PR</button>
+        ${historyHtml}
+      </div>
+    `;
+
+    modal.classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    document.getElementById('pr-value').focus();
+
+    // Auto-select on focus
+    document.getElementById('pr-value').addEventListener('focus', function () { this.select(); });
+
+    const save = () => {
+      const value = document.getElementById('pr-value').value.trim();
+      const unit = document.getElementById('pr-unit').value.trim();
+      if (!value) return;
+
+      const today = todayStr();
+      const oldPR = data.personalRecords[exerciseId];
+
+      // Build history: keep previous PR if it was different
+      let history = (oldPR && oldPR.history) ? [...oldPR.history] : [];
+      if (oldPR && oldPR.value && (oldPR.value !== value || (oldPR.unit || '') !== unit)) {
+        history.push({ value: oldPR.value, unit: oldPR.unit || '', date: oldPR.date });
+      }
+
+      data.personalRecords[exerciseId] = { value, unit, date: today, history };
+      saveData();
+      closeModal();
+      renderAll();
+      showToast(`PR saved: ${value}${unit ? ' ' + unit : ''}`);
+    };
+
+    document.getElementById('pr-save').addEventListener('click', save);
+    document.getElementById('pr-value').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') save();
+    });
+    document.getElementById('pr-unit').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') save();
+    });
   }
 
   // ===== Exercise Management (custom, edit, hide) =====
@@ -1381,7 +1444,7 @@
     document.getElementById('import-file-input').addEventListener('change', importData);
     document.getElementById('clear-all-btn').addEventListener('click', () => {
       if (confirm('Delete ALL workout data? This cannot be undone.')) {
-        data = { logs: {}, targets: {}, customExercises: {}, exerciseOverrides: {}, hiddenExercises: {} };
+        data = { logs: {}, targets: {}, customExercises: {}, exerciseOverrides: {}, hiddenExercises: {}, personalRecords: {} };
         saveData();
         closeModal();
         renderAll();
@@ -1457,6 +1520,7 @@
           if (!data.customExercises) data.customExercises = {};
           if (!data.exerciseOverrides) data.exerciseOverrides = {};
           if (!data.hiddenExercises) data.hiddenExercises = {};
+          if (!data.personalRecords) data.personalRecords = {};
           // Re-register custom exercises in lookup map
           for (const [key, exercises] of Object.entries(data.customExercises)) {
             for (const ex of exercises) {
@@ -1640,15 +1704,8 @@
     },
     {
       target: '.exercise-card',
-      title: 'Swipe to Delete',
-      text: 'Swipe an exercise left to delete or clear it.',
-      position: 'above',
-      fallback: true,
-    },
-    {
-      target: '.exercise-card',
-      title: 'Edit Exercise',
-      text: 'Long-press any exercise to change its name or emoji.',
+      title: 'Exercise Options',
+      text: 'Long-press any exercise for options: Edit, Delete, or set a Personal Record.',
       position: 'above',
       fallback: true,
     },

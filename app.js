@@ -371,7 +371,7 @@
     if (!pushWindow) return;
     clearTimeout(pushWindow.timer);
     pushWindow = null;
-    // Re-render to hide the push icon
+    // Re-render to revert action button from 🔥 back to −
     skipAnimation = true;
     renderExercises();
     skipAnimation = false;
@@ -650,6 +650,15 @@
       const hasPushWindow = pushWindow && pushWindow.exerciseId === ex.id;
 
       const isCustom = ex.id.startsWith('custom_');
+
+      // Action button: shows 🔥 during push window, − when sets exist, hidden otherwise
+      let actionBtnHtml = '';
+      if (hasPushWindow) {
+        actionBtnHtml = `<button class="card-action-btn card-action-push" data-exercise="${ex.id}" aria-label="Mark as heavy set">🔥</button>`;
+      } else if (todaySets > 0) {
+        actionBtnHtml = `<button class="card-action-btn" data-exercise="${ex.id}" aria-label="Remove last set">−</button>`;
+      }
+
       card.innerHTML = `
         <div class="swipe-inner">
           <div class="exercise-icon">${ex.icon}</div>
@@ -657,8 +666,8 @@
             <div class="exercise-name">${sanitize(ex.name)}</div>
             <div class="exercise-meta">${metaHtml}</div>
           </div>
-          <button class="push-icon${hasPushWindow ? ' push-icon-active' : ''}" data-exercise="${ex.id}" aria-label="Mark as pushed">🔥</button>
           <div class="exercise-sets">${dotsHtml}</div>
+          ${actionBtnHtml}
         </div>
         <button class="swipe-delete-btn" data-exercise="${ex.id}">Delete</button>
       `;
@@ -683,8 +692,7 @@
       // Tap on card body to log 1 set
       card.querySelector('.swipe-inner').addEventListener('click', (e) => {
         if (longPressFired) return;
-        if (e.target.closest('.exercise-sets')) return;
-        if (e.target.closest('.push-icon')) return;
+        if (e.target.closest('.card-action-btn')) return;
         logExercise(ex.id);
         showToast(`+1 set ${sanitize(ex.name)}`);
       });
@@ -695,19 +703,18 @@
         handleSwipeDelete(ex.id, activeGroup, isCustom, sanitize(ex.name));
       });
 
-      // Tap push icon to mark as pushed
-      card.querySelector('.push-icon').addEventListener('click', (e) => {
-        e.stopPropagation();
-        markLastSetAsPush(ex.id);
-      });
-
-      // Tap dots to remove last today's set
-      card.querySelector('.exercise-sets').addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (todaySets > 0) {
-          removeLastTodaySet(ex.id);
-        }
-      });
+      // Tap action button: mark push if in push window, otherwise remove last set
+      const actionBtn = card.querySelector('.card-action-btn');
+      if (actionBtn) {
+        actionBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (hasPushWindow) {
+            markLastSetAsPush(ex.id);
+          } else {
+            removeLastTodaySet(ex.id);
+          }
+        });
+      }
 
       // Close any open swipe when tapping on another card
       card.querySelector('.swipe-inner').addEventListener('touchstart', () => {
@@ -831,6 +838,7 @@
     `;
 
     modal.classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     document.getElementById('edit-exercise-name').focus();
 
     // Auto-select emoji on focus so tapping it lets user type a replacement directly
@@ -905,6 +913,7 @@
     modal.classList.remove('hidden');
 
     const input = document.getElementById('new-exercise-input');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     input.focus();
 
     const confirm = () => {
@@ -1173,11 +1182,14 @@
     badge.classList.remove('hidden');
     badge.querySelector('.streak-count').textContent = sets;
 
-    // Color tier based on milestones
-    let tier = 0;
-    for (let i = 0; i < MILESTONES.length; i++) {
-      if (sets >= MILESTONES[i].sets) tier = i + 1;
-    }
+    // Color tier: gradual progression, most change happens by 15 sets
+    let tier;
+    if (sets >= 15) tier = 5;
+    else if (sets >= 12) tier = 4;
+    else if (sets >= 9) tier = 3;
+    else if (sets >= 6) tier = 2;
+    else if (sets >= 3) tier = 1;
+    else tier = 0;
     badge.dataset.tier = tier;
 
     // Bounce animation
@@ -1620,16 +1632,9 @@
       fallback: true,
     },
     {
-      target: '.exercise-sets',
-      title: 'Remove a Set',
-      text: 'Tap the dots to undo your last set today.',
-      position: 'above',
-      fallback: true,
-    },
-    {
-      target: '.push-icon',
-      title: 'Push Set 🔥',
-      text: 'Tap the fire icon after logging to mark it as extra effort.',
+      target: '.card-action-btn',
+      title: 'Remove / Heavy Set',
+      text: 'Tap − to undo your last set. After logging, it briefly shows 🔥 — tap it to mark as extra effort.',
       position: 'above',
       fallback: true,
     },

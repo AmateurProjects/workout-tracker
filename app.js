@@ -16,7 +16,6 @@
         { id: 'pullup', name: 'Pull Up / Pull Down', icon: '💪', dots: 4 },
         { id: 'row', name: 'Row', icon: '🚣', dots: 4 },
         { id: 'upperback', name: 'Upper Back', icon: '🔝', dots: 4 },
-        { id: 'back_misc', name: 'Misc', icon: '➕', dots: 4 },
       ],
     },
     shoulders: {
@@ -27,7 +26,6 @@
         { id: 'lateral_raise', name: 'Lateral Raise', icon: '🤸', dots: 4 },
         { id: 'overhead_press', name: 'Overhead Press', icon: '⬆️', dots: 4 },
         { id: 'rear_delt', name: 'Rear Delt', icon: '🔄', dots: 4 },
-        { id: 'shoulders_misc', name: 'Misc', icon: '➕', dots: 4 },
       ],
     },
     chest: {
@@ -37,7 +35,6 @@
       exercises: [
         { id: 'chest_press', name: 'Press', icon: '🏋️', dots: 4 },
         { id: 'flys', name: 'Flys', icon: '🦅', dots: 4 },
-        { id: 'chest_misc', name: 'Misc', icon: '➕', dots: 4 },
       ],
     },
     legs: {
@@ -51,7 +48,6 @@
         { id: 'calf_raise', name: 'Calf Raise', icon: '🦶', dots: 4 },
         { id: 'rdl', name: 'RDL', icon: '🏋️', dots: 4 },
         { id: 'squats', name: 'Squats', icon: '⬇️', dots: 4 },
-        { id: 'legs_misc', name: 'Misc', icon: '➕', dots: 4 },
       ],
     },
     arms: {
@@ -62,7 +58,6 @@
         { id: 'bicep_curls', name: 'Bicep Curls', icon: '💪', dots: 4 },
         { id: 'forearms', name: 'Forearms', icon: '🤜', dots: 4 },
         { id: 'triceps', name: 'Triceps', icon: '🔻', dots: 4 },
-        { id: 'arms_misc', name: 'Misc', icon: '➕', dots: 4 },
       ],
     },
     cardio: {
@@ -371,6 +366,74 @@
     saveData();
   }
 
+  // ===== Swipe-to-delete =====
+  const SWIPE_THRESHOLD = 70;
+
+  function setupSwipe(card) {
+    const inner = card.querySelector('.swipe-inner');
+    let startX = 0, currentX = 0, swiping = false, opened = false;
+
+    inner.addEventListener('touchstart', (e) => {
+      startX = e.touches[0].clientX;
+      currentX = 0;
+      swiping = true;
+      inner.style.transition = 'none';
+    }, { passive: true });
+
+    inner.addEventListener('touchmove', (e) => {
+      if (!swiping) return;
+      const dx = e.touches[0].clientX - startX;
+      // Allow only leftward swipe (negative), or rightward to close
+      if (opened) {
+        currentX = Math.min(0, Math.max(-SWIPE_THRESHOLD, dx - SWIPE_THRESHOLD));
+      } else {
+        currentX = Math.min(0, dx);
+      }
+      inner.style.transform = `translateX(${currentX}px)`;
+      // Prevent vertical scroll while swiping horizontally
+      if (Math.abs(dx) > 10) e.preventDefault();
+    }, { passive: false });
+
+    inner.addEventListener('touchend', () => {
+      swiping = false;
+      inner.style.transition = 'transform 0.25s ease';
+      if (currentX < -SWIPE_THRESHOLD / 2) {
+        inner.style.transform = `translateX(-${SWIPE_THRESHOLD}px)`;
+        opened = true;
+        card.classList.add('swipe-open');
+      } else {
+        inner.style.transform = 'translateX(0)';
+        opened = false;
+        card.classList.remove('swipe-open');
+      }
+    }, { passive: true });
+
+    card._closeSwipe = () => {
+      inner.style.transition = 'transform 0.25s ease';
+      inner.style.transform = 'translateX(0)';
+      opened = false;
+      card.classList.remove('swipe-open');
+    };
+  }
+
+  function closeAllSwipes(exceptCard) {
+    document.querySelectorAll('.exercise-card.swipe-open').forEach(c => {
+      if (c !== exceptCard && c._closeSwipe) c._closeSwipe();
+    });
+  }
+
+  function handleSwipeDelete(exerciseId, groupKey, isCustom, name) {
+    if (isCustom) {
+      removeCustomExercise(groupKey, exerciseId);
+      showToast(`Deleted ${name}`);
+    } else {
+      delete data.logs[exerciseId];
+      saveData();
+      showToast(`Cleared ${name} history`);
+    }
+    renderAll();
+  }
+
   // ===== Rendering =====
   let skipAnimation = false;
 
@@ -461,7 +524,7 @@
         const stepperRow = document.createElement('div');
         stepperRow.className = 'target-stepper-row';
         stepperRow.innerHTML = `
-          <span class="target-label">Goal</span>
+          <span class="target-label">14-Day Goal</span>
           <button class="target-btn" data-dir="-1" aria-label="Decrease target">&minus;</button>
           <span class="target-value">${target}</span>
           <button class="target-btn" data-dir="1" aria-label="Increase target">&plus;</button>
@@ -521,22 +584,35 @@
       // Check if push window is active for this exercise
       const hasPushWindow = pushWindow && pushWindow.exerciseId === ex.id;
 
+      const isCustom = ex.id.startsWith('custom_');
       card.innerHTML = `
-        <div class="exercise-icon">${ex.icon}</div>
-        <div class="exercise-info">
-          <div class="exercise-name">${sanitize(ex.name)}</div>
-          <div class="exercise-meta">${metaHtml}</div>
+        <div class="swipe-inner">
+          <div class="exercise-icon">${ex.icon}</div>
+          <div class="exercise-info">
+            <div class="exercise-name">${sanitize(ex.name)}</div>
+            <div class="exercise-meta">${metaHtml}</div>
+          </div>
+          <button class="push-icon${hasPushWindow ? ' push-icon-active' : ''}" data-exercise="${ex.id}" aria-label="Mark as pushed">🔥</button>
+          <div class="exercise-sets">${dotsHtml}</div>
         </div>
-        <button class="push-icon${hasPushWindow ? ' push-icon-active' : ''}" data-exercise="${ex.id}" aria-label="Mark as pushed">🔥</button>
-        <div class="exercise-sets">${dotsHtml}</div>
+        <button class="swipe-delete-btn" data-exercise="${ex.id}" data-custom="${isCustom}">${isCustom ? 'Delete' : 'Clear'}</button>
       `;
 
+      // Swipe-to-reveal-delete
+      setupSwipe(card);
+
       // Tap on card body to log 1 set
-      card.addEventListener('click', (e) => {
+      card.querySelector('.swipe-inner').addEventListener('click', (e) => {
         if (e.target.closest('.exercise-sets')) return;
         if (e.target.closest('.push-icon')) return;
         logExercise(ex.id);
         showToast(`+1 set ${sanitize(ex.name)}`);
+      });
+
+      // Tap delete button
+      card.querySelector('.swipe-delete-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        handleSwipeDelete(ex.id, activeGroup, isCustom, sanitize(ex.name));
       });
 
       // Tap push icon to mark as pushed
@@ -552,6 +628,11 @@
           removeLastTodaySet(ex.id);
         }
       });
+
+      // Close any open swipe when tapping on another card
+      card.querySelector('.swipe-inner').addEventListener('touchstart', () => {
+        closeAllSwipes(card);
+      }, { passive: true });
 
       container.appendChild(card);
 
@@ -1164,54 +1245,67 @@
   const TUTORIAL_STEPS = [
     {
       target: '#summary',
-      title: 'Volume Overview',
-      text: 'This card shows how many sets you\'ve logged per muscle group over the last 14 days. Colors show recency — green is recent, yellow is older, red is about to expire.',
+      title: '14-Day Volume',
+      text: 'Your sets per muscle group over 14 days.',
       position: 'below',
     },
     {
       target: '.summary-row',
-      title: 'Muscle Groups',
-      text: 'Tap any muscle group to select it. This reveals the exercises below and a goal adjuster (+/−) so you can set your target volume.',
+      title: 'Bar Colors',
+      text: 'Green = recent, yellow = older, red = expiring soon.',
       position: 'below',
     },
     {
-      target: '#exercises',
-      title: 'Log Your Sets',
-      text: 'Tap an exercise card to log 1 set. The border color shows when you last performed it. Dots on the right track today\'s sets.',
+      target: '.summary-row',
+      title: 'Select a Group',
+      text: 'Tap a muscle group to see its exercises.',
+      position: 'below',
+    },
+    {
+      target: '.target-stepper-row',
+      title: 'Adjust Your Goal',
+      text: 'Use +/− to change the 14-day set target.',
+      position: 'below',
+      fallback: true,
+    },
+    {
+      target: '.exercise-card',
+      title: 'Log a Set',
+      text: 'Tap any exercise card to add 1 set.',
       position: 'above',
       fallback: true,
     },
     {
       target: '.exercise-sets',
-      title: 'Undo a Set',
-      text: 'Tap the dots on any exercise to remove the last set you logged today.',
+      title: 'Remove a Set',
+      text: 'Tap the dots to undo your last set today.',
       position: 'above',
       fallback: true,
     },
     {
       target: '.push-icon',
-      title: 'Push Sets 🔥',
-      text: 'After logging a set, the fire icon appears briefly. Tap it to mark that set as a "push" set — meaning you went extra hard. Push sets show as gold.',
+      title: 'Push Set 🔥',
+      text: 'Tap the fire icon after logging to mark it as extra effort.',
       position: 'above',
       fallback: true,
     },
     {
-      target: '.exercise-more',
-      title: 'Exercise History',
-      text: 'Tap the ⋯ button to see the full history for any exercise, grouped by date.',
+      target: '.exercise-card-add',
+      title: 'Custom Exercises',
+      text: 'Add your own exercises to any group.',
       position: 'above',
       fallback: true,
     },
     {
       target: '#settings-btn',
-      title: 'Settings',
-      text: 'Export your data, edit past history in a grid view, or clear everything from here.',
+      title: 'Settings ⚙️',
+      text: 'Edit history, backup, import, or clear data.',
       position: 'below',
     },
     {
       target: '#help-btn',
-      title: 'That\'s It!',
-      text: 'You can replay this guide anytime by tapping the ❓ button. Now go crush your workout! 💪',
+      title: 'You\'re All Set! 💪',
+      text: 'Tap ❓ anytime to replay this guide.',
       position: 'below',
     },
   ];

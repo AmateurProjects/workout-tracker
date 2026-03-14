@@ -87,8 +87,16 @@
       EXERCISE_GROUP_MAP[ex.id] = key;
     }
   }
+  // Also register any saved custom exercises
+  for (const [key, exercises] of Object.entries(data.customExercises || {})) {
+    for (const ex of exercises) {
+      EXERCISE_GROUP_MAP[ex.id] = key;
+    }
+  }
 
   let data = loadData();
+  // Ensure customExercises exists for older data
+  if (!data.customExercises) data.customExercises = {};
   let activeGroup = null;
   let undoTimeout = null;
   let lastAction = null;
@@ -105,9 +113,10 @@
     } catch (e) {
       console.error('Failed to load data', e);
     }
-    return { logs: {}, targets: {} };
+    return { logs: {}, targets: {}, customExercises: {} };
     // logs: { [exerciseId]: [ { date: "YYYY-MM-DD" }, ... ] }
     // targets: { [groupKey]: number }
+    // customExercises: { [groupKey]: [ { id, name, icon, dots } ] }
   }
 
   function saveData() {
@@ -204,17 +213,17 @@
   }
 
   function getGroupStats14Days(groupKey) {
-    const group = MUSCLE_GROUPS[groupKey];
+    const exercises = getGroupExercises(groupKey);
     const today = todayStr();
     let total = 0;
     let pushed = 0;
     // Freshness buckets: today(0), yesterday(1), recent(2-12), expiring(13-14)
     const buckets = { today: 0, yesterday: 0, recent: 0, expiring: 0 };
-    for (const ex of group.exercises) {
+    for (const ex of exercises) {
       const logs = data.logs[ex.id] || [];
       for (const l of logs) {
         const ago = daysBetween(l.date, today);
-        if (ago <= VOLUME_WINDOW_DAYS) {
+        if (ago < VOLUME_WINDOW_DAYS) {
           total++;
           if (l.push) pushed++;
           if (ago === 0) buckets.today++;
@@ -336,6 +345,30 @@
     return null;
   }
 
+  function getGroupExercises(groupKey) {
+    const builtIn = MUSCLE_GROUPS[groupKey].exercises;
+    const custom = (data.customExercises[groupKey] || []);
+    return builtIn.concat(custom);
+  }
+
+  function addCustomExercise(groupKey, name) {
+    if (!data.customExercises[groupKey]) data.customExercises[groupKey] = [];
+    const id = 'custom_' + groupKey + '_' + Date.now();
+    const ex = { id, name, icon: '🏋️', dots: 4 };
+    data.customExercises[groupKey].push(ex);
+    EXERCISE_GROUP_MAP[id] = groupKey;
+    saveData();
+    return ex;
+  }
+
+  function removeCustomExercise(groupKey, exerciseId) {
+    if (!data.customExercises[groupKey]) return;
+    data.customExercises[groupKey] = data.customExercises[groupKey].filter(e => e.id !== exerciseId);
+    delete EXERCISE_GROUP_MAP[exerciseId];
+    delete data.logs[exerciseId];
+    saveData();
+  }
+
   // ===== Rendering =====
   let skipAnimation = false;
 
@@ -373,6 +406,9 @@
     const groupKeys = Object.keys(MUSCLE_GROUPS);
 
     for (const key of groupKeys) {
+      // When a group is active, only render that group
+      if (activeGroup && key !== activeGroup) continue;
+
       const group = MUSCLE_GROUPS[key];
       const target = getTarget(key);
       const { total: vol, pushed: pushVol, buckets } = getGroupStats14Days(key);
@@ -399,7 +435,6 @@
       row.className = 'summary-row';
       row.dataset.group = key;
       if (key === activeGroup) row.classList.add('active');
-      if (activeGroup && key !== activeGroup) row.classList.add('faded');
       row.innerHTML = `
         <span class="summary-label">${group.label}</span>
         <div class="summary-bar-track">
@@ -424,6 +459,7 @@
         const stepperRow = document.createElement('div');
         stepperRow.className = 'target-stepper-row';
         stepperRow.innerHTML = `
+          <span class="target-label">Goal</span>
           <button class="target-btn" data-dir="-1" aria-label="Decrease target">&minus;</button>
           <span class="target-value">${target}</span>
           <button class="target-btn" data-dir="1" aria-label="Increase target">&plus;</button>
@@ -450,7 +486,8 @@
     if (!group) return;
 
     let idx = 0;
-    for (const ex of group.exercises) {
+    const exercises = getGroupExercises(activeGroup);
+    for (const ex of exercises) {
       const todayLogs = getTodayLogs(ex.id);
       const todaySets = todayLogs.length;
       const lastDate = getLastDate(ex.id);
@@ -490,12 +527,10 @@
         </div>
         <button class="push-icon${hasPushWindow ? ' push-icon-active' : ''}" data-exercise="${ex.id}" aria-label="Mark as pushed">🔥</button>
         <div class="exercise-sets">${dotsHtml}</div>
-        <button class="exercise-more" data-exercise="${ex.id}" aria-label="History">⋯</button>
       `;
 
       // Tap on card body to log 1 set
       card.addEventListener('click', (e) => {
-        if (e.target.closest('.exercise-more')) return;
         if (e.target.closest('.exercise-sets')) return;
         if (e.target.closest('.push-icon')) return;
         logExercise(ex.id);
@@ -516,18 +551,27 @@
         }
       });
 
-      // Tap ⋯ for history
-      card.querySelector('.exercise-more').addEventListener('click', (e) => {
-        e.stopPropagation();
-        openHistory(ex);
-      });
-
       container.appendChild(card);
 
       // Animate entrance based on group
       animateCardIn(card, activeGroup, idx);
       idx++;
     }
+
+    // "Add Exercise" card at the bottom
+    const addCard = document.createElement('div');
+    addCard.className = `exercise-card exercise-card-add group-${activeGroup}`;
+    addCard.innerHTML = `
+      <div class="exercise-icon">➕</div>
+      <div class="exercise-info">
+        <div class="exercise-name" style="color:var(--text-dim)">Add Exercise</div>
+      </div>
+    `;
+    addCard.addEventListener('click', () => {
+      promptAddExercise(activeGroup);
+    });
+    container.appendChild(addCard);
+    animateCardIn(addCard, activeGroup, idx);
   }
 
   const GROUP_ANIMATIONS = {
@@ -598,6 +642,42 @@
     if (skipAnimation) return;
     const anim = GROUP_ANIMATIONS[groupKey];
     if (anim) anim(card, index);
+  }
+
+  // ===== Add Custom Exercise =====
+  function promptAddExercise(groupKey) {
+    const modal = document.getElementById('modal');
+    const title = document.getElementById('modal-title');
+    const body = document.getElementById('modal-body');
+
+    title.textContent = 'Add Exercise';
+    body.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <input type="text" id="new-exercise-input" placeholder="Exercise name" maxlength="40"
+          style="background:var(--bg);border:2px solid var(--surface2);border-radius:10px;padding:12px 14px;color:var(--text);font-size:1rem;outline:none;width:100%;box-sizing:border-box;"
+        />
+        <button class="btn btn-primary" id="add-exercise-confirm">Add</button>
+      </div>
+    `;
+
+    modal.classList.remove('hidden');
+
+    const input = document.getElementById('new-exercise-input');
+    input.focus();
+
+    const confirm = () => {
+      const name = input.value.trim();
+      if (!name) return;
+      addCustomExercise(groupKey, name);
+      closeModal();
+      renderAll();
+      showToast(`Added ${sanitize(name)}`);
+    };
+
+    document.getElementById('add-exercise-confirm').addEventListener('click', confirm);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') confirm();
+    });
   }
 
   // ===== Celebration =====
@@ -829,6 +909,9 @@
 
     // Settings gear
     document.getElementById('settings-btn').addEventListener('click', openSettings);
+
+    // Help button
+    document.getElementById('help-btn').addEventListener('click', startTutorial);
   }
 
   // ===== Settings / Import / Export =====
@@ -845,8 +928,11 @@
       <div class="settings-section">
         <p style="color:var(--text-dim);font-size:0.85rem;margin-bottom:16px;">${totalLogs} total sets logged</p>
         <button class="btn btn-primary settings-action" id="edit-history-btn">Edit History</button>
-        <button class="btn btn-primary settings-action" id="export-btn">Export Data</button>
+        <button class="btn btn-primary settings-action" id="export-btn">Download Backup</button>
+        <button class="btn btn-primary settings-action" id="email-btn">Email Backup</button>
+        <button class="btn btn-primary settings-action" id="import-btn">Import Backup</button>
         <button class="btn btn-danger settings-action" id="clear-all-btn">Clear All Data</button>
+        <input type="file" id="import-file-input" accept=".json" style="display:none" />
       </div>
     `;
 
@@ -854,9 +940,14 @@
       openHistoryEditor();
     });
     document.getElementById('export-btn').addEventListener('click', exportData);
+    document.getElementById('email-btn').addEventListener('click', emailBackup);
+    document.getElementById('import-btn').addEventListener('click', () => {
+      document.getElementById('import-file-input').click();
+    });
+    document.getElementById('import-file-input').addEventListener('change', importData);
     document.getElementById('clear-all-btn').addEventListener('click', () => {
       if (confirm('Delete ALL workout data? This cannot be undone.')) {
-        data = { logs: {}, targets: {} };
+        data = { logs: {}, targets: {}, customExercises: {} };
         saveData();
         closeModal();
         renderAll();
@@ -877,6 +968,77 @@
     a.click();
     URL.revokeObjectURL(url);
     showToast('Data exported');
+  }
+
+  function emailBackup() {
+    const modal = document.getElementById('modal');
+    const title = document.getElementById('modal-title');
+    const body = document.getElementById('modal-body');
+
+    title.textContent = 'Email Backup';
+    body.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <p style="color:var(--text-dim);font-size:0.85rem;">Enter your email and we'll open your mail app with your workout data attached as text.</p>
+        <input type="email" id="email-input" placeholder="your@email.com"
+          style="background:var(--bg);border:2px solid var(--surface2);border-radius:10px;padding:12px 14px;color:var(--text);font-size:1rem;outline:none;width:100%;box-sizing:border-box;"
+        />
+        <button class="btn btn-primary" id="email-send-btn">Send</button>
+      </div>
+    `;
+    modal.classList.remove('hidden');
+
+    const input = document.getElementById('email-input');
+    input.focus();
+
+    const send = () => {
+      const email = input.value.trim();
+      if (!email) return;
+      const json = JSON.stringify(data);
+      const subject = encodeURIComponent('Workout Tracker Backup - ' + todayStr());
+      const bodyText = encodeURIComponent('Paste this into a .json file and use Import Backup to restore:\n\n' + json);
+      window.location.href = 'mailto:' + encodeURIComponent(email) + '?subject=' + subject + '&body=' + bodyText;
+      showToast('Opening mail app...');
+    };
+
+    document.getElementById('email-send-btn').addEventListener('click', send);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') send();
+    });
+  }
+
+  function importData(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function (ev) {
+      try {
+        const imported = JSON.parse(ev.target.result);
+        if (!imported.logs || typeof imported.logs !== 'object') {
+          showToast('Invalid backup file');
+          return;
+        }
+        if (confirm('Replace all current data with imported backup?')) {
+          data = imported;
+          if (!data.targets) data.targets = {};
+          if (!data.customExercises) data.customExercises = {};
+          // Re-register custom exercises in lookup map
+          for (const [key, exercises] of Object.entries(data.customExercises)) {
+            for (const ex of exercises) {
+              EXERCISE_GROUP_MAP[ex.id] = key;
+            }
+          }
+          saveData();
+          closeModal();
+          renderAll();
+          showToast('Data imported successfully');
+        }
+      } catch (err) {
+        showToast('Failed to read file');
+      }
+    };
+    reader.readAsText(file);
+    // Reset input so the same file can be selected again
+    e.target.value = '';
   }
 
   // ===== History Editor =====
@@ -994,5 +1156,185 @@
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
+  }
+
+  // ===== Tutorial Walkthrough =====
+  const TUTORIAL_STEPS = [
+    {
+      target: '#summary',
+      title: 'Volume Overview',
+      text: 'This card shows how many sets you\'ve logged per muscle group over the last 14 days. Colors show recency — green is recent, yellow is older, red is about to expire.',
+      position: 'below',
+    },
+    {
+      target: '.summary-row',
+      title: 'Muscle Groups',
+      text: 'Tap any muscle group to select it. This reveals the exercises below and a goal adjuster (+/−) so you can set your target volume.',
+      position: 'below',
+    },
+    {
+      target: '#exercises',
+      title: 'Log Your Sets',
+      text: 'Tap an exercise card to log 1 set. The border color shows when you last performed it. Dots on the right track today\'s sets.',
+      position: 'above',
+      fallback: true,
+    },
+    {
+      target: '.exercise-sets',
+      title: 'Undo a Set',
+      text: 'Tap the dots on any exercise to remove the last set you logged today.',
+      position: 'above',
+      fallback: true,
+    },
+    {
+      target: '.push-icon',
+      title: 'Push Sets 🔥',
+      text: 'After logging a set, the fire icon appears briefly. Tap it to mark that set as a "push" set — meaning you went extra hard. Push sets show as gold.',
+      position: 'above',
+      fallback: true,
+    },
+    {
+      target: '.exercise-more',
+      title: 'Exercise History',
+      text: 'Tap the ⋯ button to see the full history for any exercise, grouped by date.',
+      position: 'above',
+      fallback: true,
+    },
+    {
+      target: '#settings-btn',
+      title: 'Settings',
+      text: 'Export your data, edit past history in a grid view, or clear everything from here.',
+      position: 'below',
+    },
+    {
+      target: '#help-btn',
+      title: 'That\'s It!',
+      text: 'You can replay this guide anytime by tapping the ❓ button. Now go crush your workout! 💪',
+      position: 'below',
+    },
+  ];
+
+  let tutorialStep = 0;
+  let tutorialOverlay = null;
+
+  function startTutorial() {
+    // Ensure a group is selected so exercise cards are visible for later steps
+    if (!activeGroup) {
+      switchToGroup('back');
+    }
+    tutorialStep = 0;
+    showTutorialStep();
+  }
+
+  function showTutorialStep() {
+    // Clean up previous overlay
+    if (tutorialOverlay) tutorialOverlay.remove();
+    if (tutorialStep >= TUTORIAL_STEPS.length) return;
+
+    const step = TUTORIAL_STEPS[tutorialStep];
+    let targetEl = document.querySelector(step.target);
+
+    // If target doesn't exist (e.g. no exercises rendered), skip
+    if (!targetEl && step.fallback) {
+      tutorialStep++;
+      showTutorialStep();
+      return;
+    }
+    if (!targetEl) targetEl = document.getElementById('app');
+
+    const rect = targetEl.getBoundingClientRect();
+    const pad = 8;
+
+    // Build overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'tutorial-overlay';
+
+    // Transparent backdrop (click handler only)
+    const backdrop = document.createElement('div');
+    backdrop.className = 'tutorial-backdrop';
+    backdrop.style.background = 'transparent';
+    overlay.appendChild(backdrop);
+
+    // Spotlight cutout
+    const spotlight = document.createElement('div');
+    spotlight.className = 'tutorial-spotlight';
+    spotlight.style.top = (rect.top - pad) + 'px';
+    spotlight.style.left = (rect.left - pad) + 'px';
+    spotlight.style.width = (rect.width + pad * 2) + 'px';
+    spotlight.style.height = (rect.height + pad * 2) + 'px';
+    overlay.appendChild(spotlight);
+
+    // Tooltip
+    const tooltip = document.createElement('div');
+    tooltip.className = 'tutorial-tooltip';
+
+    // Progress dots
+    let dotsHtml = '<div class="tutorial-dots">';
+    for (let i = 0; i < TUTORIAL_STEPS.length; i++) {
+      dotsHtml += `<div class="tutorial-dot${i === tutorialStep ? ' active' : ''}"></div>`;
+    }
+    dotsHtml += '</div>';
+
+    const isLast = tutorialStep === TUTORIAL_STEPS.length - 1;
+    tooltip.innerHTML = `
+      <div class="tutorial-title">${step.title}</div>
+      <div class="tutorial-text">${step.text}</div>
+      <div class="tutorial-footer">
+        ${dotsHtml}
+        <div style="display:flex;gap:10px;align-items:center">
+          ${!isLast ? '<button class="tutorial-skip">Skip</button>' : ''}
+          <button class="tutorial-next">${isLast ? 'Done' : 'Next'}</button>
+        </div>
+      </div>
+    `;
+
+    // Position tooltip
+    overlay.appendChild(tooltip);
+    document.body.appendChild(overlay);
+    tutorialOverlay = overlay;
+
+    // Calculate position after it's in DOM
+    const tooltipRect = tooltip.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let tooltipLeft = Math.max(16, Math.min(rect.left + rect.width / 2 - tooltipRect.width / 2, vw - tooltipRect.width - 16));
+
+    if (step.position === 'below') {
+      tooltip.style.top = (rect.bottom + pad + 12) + 'px';
+    } else {
+      let above = rect.top - pad - 12 - tooltipRect.height;
+      if (above < 16) above = rect.bottom + pad + 12;
+      tooltip.style.top = above + 'px';
+    }
+    tooltip.style.left = tooltipLeft + 'px';
+
+    // Event handlers
+    tooltip.querySelector('.tutorial-next').addEventListener('click', (e) => {
+      e.stopPropagation();
+      tutorialStep++;
+      showTutorialStep();
+    });
+
+    const skipBtn = tooltip.querySelector('.tutorial-skip');
+    if (skipBtn) {
+      skipBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        endTutorial();
+      });
+    }
+
+    // Tap backdrop to advance
+    backdrop.addEventListener('click', () => {
+      tutorialStep++;
+      showTutorialStep();
+    });
+  }
+
+  function endTutorial() {
+    if (tutorialOverlay) {
+      tutorialOverlay.remove();
+      tutorialOverlay = null;
+    }
+    tutorialStep = 0;
   }
 })();

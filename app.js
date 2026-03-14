@@ -94,6 +94,9 @@
     }
   }
 
+  if (!data.exerciseOverrides) data.exerciseOverrides = {};
+  if (!data.hiddenExercises) data.hiddenExercises = {};
+
   let activeGroup = null;
   let undoTimeout = null;
   let lastAction = null;
@@ -110,10 +113,12 @@
     } catch (e) {
       console.error('Failed to load data', e);
     }
-    return { logs: {}, targets: {}, customExercises: {} };
+    return { logs: {}, targets: {}, customExercises: {}, exerciseOverrides: {}, hiddenExercises: {} };
     // logs: { [exerciseId]: [ { date: "YYYY-MM-DD" }, ... ] }
     // targets: { [groupKey]: number }
     // customExercises: { [groupKey]: [ { id, name, icon, dots } ] }
+    // exerciseOverrides: { [exerciseId]: { name, icon } }
+    // hiddenExercises: { [groupKey]: [ exerciseId, ... ] }
   }
 
   function saveData() {
@@ -334,18 +339,29 @@
     skipAnimation = false;
   }
 
+  function applyOverride(ex) {
+    const ov = data.exerciseOverrides[ex.id];
+    if (!ov) return ex;
+    return { ...ex, name: ov.name || ex.name, icon: ov.icon || ex.icon };
+  }
+
   function findExercise(exerciseId) {
     for (const group of Object.values(MUSCLE_GROUPS)) {
       const ex = group.exercises.find(e => e.id === exerciseId);
-      if (ex) return ex;
+      if (ex) return applyOverride(ex);
+    }
+    for (const customs of Object.values(data.customExercises)) {
+      const ex = customs.find(e => e.id === exerciseId);
+      if (ex) return applyOverride(ex);
     }
     return null;
   }
 
   function getGroupExercises(groupKey) {
-    const builtIn = MUSCLE_GROUPS[groupKey].exercises;
+    const hidden = data.hiddenExercises[groupKey] || [];
+    const builtIn = MUSCLE_GROUPS[groupKey].exercises.filter(e => !hidden.includes(e.id));
     const custom = (data.customExercises[groupKey] || []);
-    return builtIn.concat(custom);
+    return builtIn.concat(custom).map(applyOverride);
   }
 
   function addCustomExercise(groupKey, name) {
@@ -425,12 +441,14 @@
   function handleSwipeDelete(exerciseId, groupKey, isCustom, name) {
     if (isCustom) {
       removeCustomExercise(groupKey, exerciseId);
-      showToast(`Deleted ${name}`);
     } else {
+      if (!data.hiddenExercises[groupKey]) data.hiddenExercises[groupKey] = [];
+      data.hiddenExercises[groupKey].push(exerciseId);
       delete data.logs[exerciseId];
+      delete data.exerciseOverrides[exerciseId];
       saveData();
-      showToast(`Cleared ${name} history`);
     }
+    showToast(`Deleted ${name}`);
     renderAll();
   }
 
@@ -595,14 +613,29 @@
           <button class="push-icon${hasPushWindow ? ' push-icon-active' : ''}" data-exercise="${ex.id}" aria-label="Mark as pushed">🔥</button>
           <div class="exercise-sets">${dotsHtml}</div>
         </div>
-        <button class="swipe-delete-btn" data-exercise="${ex.id}" data-custom="${isCustom}">${isCustom ? 'Delete' : 'Clear'}</button>
+        <button class="swipe-delete-btn" data-exercise="${ex.id}">Delete</button>
       `;
 
       // Swipe-to-reveal-delete
       setupSwipe(card);
 
+      // Long-press to edit
+      let longPressTimer = null;
+      let longPressFired = false;
+      const inner = card.querySelector('.swipe-inner');
+      inner.addEventListener('touchstart', (e) => {
+        longPressFired = false;
+        longPressTimer = setTimeout(() => {
+          longPressFired = true;
+          promptEditExercise(ex.id, activeGroup);
+        }, 500);
+      }, { passive: true });
+      inner.addEventListener('touchend', () => { clearTimeout(longPressTimer); }, { passive: true });
+      inner.addEventListener('touchmove', () => { clearTimeout(longPressTimer); }, { passive: true });
+
       // Tap on card body to log 1 set
       card.querySelector('.swipe-inner').addEventListener('click', (e) => {
+        if (longPressFired) return;
         if (e.target.closest('.exercise-sets')) return;
         if (e.target.closest('.push-icon')) return;
         logExercise(ex.id);
@@ -728,10 +761,82 @@
   }
 
   // ===== Add Custom Exercise =====
+  function promptEditExercise(exerciseId, groupKey) {
+    const ex = findExercise(exerciseId);
+    if (!ex) return;
+
+    const modal = document.getElementById('modal');
+    const title = document.getElementById('modal-title');
+    const body = document.getElementById('modal-body');
+
+    title.textContent = 'Edit Exercise';
+    body.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="edit-emoji-row">
+          <input type="text" id="edit-exercise-icon" value="${ex.icon}" maxlength="4"
+            class="edit-emoji-input" />
+          <input type="text" id="edit-exercise-name" value="${sanitize(ex.name)}" maxlength="40" placeholder="Exercise name"
+            style="background:var(--bg);border:2px solid var(--surface2);border-radius:10px;padding:12px 14px;color:var(--text);font-size:1rem;outline:none;flex:1;box-sizing:border-box;" />
+        </div>
+        <button class="btn btn-primary" id="edit-exercise-save">Save</button>
+      </div>
+    `;
+
+    modal.classList.remove('hidden');
+    document.getElementById('edit-exercise-name').focus();
+
+    const save = () => {
+      const newName = document.getElementById('edit-exercise-name').value.trim();
+      const newIcon = document.getElementById('edit-exercise-icon').value.trim();
+      if (!newName) return;
+      data.exerciseOverrides[exerciseId] = {
+        name: newName,
+        icon: newIcon || ex.icon,
+      };
+      // Also update custom exercise source object if applicable
+      if (exerciseId.startsWith('custom_') && data.customExercises[groupKey]) {
+        const src = data.customExercises[groupKey].find(e => e.id === exerciseId);
+        if (src) { src.name = newName; src.icon = newIcon || src.icon; }
+      }
+      saveData();
+      closeModal();
+      renderAll();
+      showToast(`Updated ${sanitize(newName)}`);
+    };
+
+    document.getElementById('edit-exercise-save').addEventListener('click', save);
+    document.getElementById('edit-exercise-name').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') save();
+    });
+    document.getElementById('edit-exercise-icon').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') save();
+    });
+  }
+
   function promptAddExercise(groupKey) {
     const modal = document.getElementById('modal');
     const title = document.getElementById('modal-title');
     const body = document.getElementById('modal-body');
+
+    // Find hidden built-in exercises that can be restored
+    const hidden = data.hiddenExercises[groupKey] || [];
+    const restoreList = MUSCLE_GROUPS[groupKey].exercises
+      .filter(e => hidden.includes(e.id))
+      .map(applyOverride);
+
+    let restoreHtml = '';
+    if (restoreList.length) {
+      restoreHtml = `
+        <div class="restore-divider">Restore removed</div>
+        <div class="restore-list">
+          ${restoreList.map(e => `
+            <button class="restore-btn" data-id="${e.id}">
+              <span>${e.icon}</span> ${sanitize(e.name)}
+            </button>
+          `).join('')}
+        </div>
+      `;
+    }
 
     title.textContent = 'Add Exercise';
     body.innerHTML = `
@@ -740,6 +845,7 @@
           style="background:var(--bg);border:2px solid var(--surface2);border-radius:10px;padding:12px 14px;color:var(--text);font-size:1rem;outline:none;width:100%;box-sizing:border-box;"
         />
         <button class="btn btn-primary" id="add-exercise-confirm">Add</button>
+        ${restoreHtml}
       </div>
     `;
 
@@ -760,6 +866,19 @@
     document.getElementById('add-exercise-confirm').addEventListener('click', confirm);
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') confirm();
+    });
+
+    // Restore hidden exercise buttons
+    body.querySelectorAll('.restore-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.id;
+        data.hiddenExercises[groupKey] = (data.hiddenExercises[groupKey] || []).filter(h => h !== id);
+        saveData();
+        closeModal();
+        renderAll();
+        const ex = findExercise(id);
+        showToast(`Restored ${ex ? sanitize(ex.name) : 'exercise'}`);
+      });
     });
   }
 

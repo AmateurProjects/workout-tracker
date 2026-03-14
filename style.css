@@ -350,6 +350,7 @@ body {
   justify-content: center;
   font-size: 1.4rem;
   flex-shrink: 0;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
 }
 
 .exercise-info {
@@ -685,12 +686,12 @@ body {
 }
 
 /* ===== Muscle group colors ===== */
-.group-back .exercise-icon { background: rgba(99, 179, 255, 0.15); color: #63b3ff; }
-.group-shoulders .exercise-icon { background: rgba(255, 159, 67, 0.15); color: #ff9f43; }
-.group-chest .exercise-icon { background: rgba(255, 107, 129, 0.15); color: #ff6b81; }
-.group-legs .exercise-icon { background: rgba(46, 213, 115, 0.15); color: #2ed573; }
-.group-arms .exercise-icon { background: rgba(206, 130, 255, 0.15); color: #ce82ff; }
-.group-cardio .exercise-icon { background: rgba(255, 234, 100, 0.15); color: #ffea64; }
+.group-back .exercise-icon { background: rgba(99, 179, 255, 0.30); }
+.group-shoulders .exercise-icon { background: rgba(255, 159, 67, 0.30); }
+.group-chest .exercise-icon { background: rgba(255, 107, 129, 0.30); }
+.group-legs .exercise-icon { background: rgba(46, 213, 115, 0.30); }
+.group-arms .exercise-icon { background: rgba(206, 130, 255, 0.30); }
+.group-cardio .exercise-icon { background: rgba(255, 234, 100, 0.30); }
 
 /* ===== Celebration ===== */
 .celebrate-overlay {

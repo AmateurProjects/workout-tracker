@@ -121,7 +121,7 @@
       exercises: [
         { id: 'pullup', name: 'Pull Up / Pull Down', icon: '💪', dots: 4 },
         { id: 'row', name: 'Row', icon: '🚣', dots: 4 },
-        { id: 'upperback', name: 'Upper Back', icon: '🔝', dots: 4 },
+        { id: 'upperback', name: 'Upper Back', icon: '🦅', dots: 4 },
       ],
     },
     shoulders: {
@@ -129,9 +129,9 @@
       icon: '🏋️',
       target: 15,
       exercises: [
-        { id: 'lateral_raise', name: 'Lateral Raise', icon: '🤸', dots: 4 },
-        { id: 'overhead_press', name: 'Overhead Press', icon: '⬆️', dots: 4 },
-        { id: 'rear_delt', name: 'Rear Delt', icon: '🔄', dots: 4 },
+        { id: 'lateral_raise', name: 'Lateral Raise', icon: '🙆', dots: 4 },
+        { id: 'overhead_press', name: 'Overhead Press', icon: '🏋️', dots: 4 },
+        { id: 'rear_delt', name: 'Rear Delt', icon: '🦋', dots: 4 },
       ],
     },
     chest: {
@@ -139,8 +139,8 @@
       icon: '🫁',
       target: 15,
       exercises: [
-        { id: 'chest_press', name: 'Press', icon: '🏋️', dots: 4 },
-        { id: 'flys', name: 'Flys', icon: '🦅', dots: 4 },
+        { id: 'chest_press', name: 'Chest Press', icon: '🎽', dots: 4 },
+        { id: 'flys', name: 'Flys', icon: '�', dots: 4 },
       ],
     },
     legs: {
@@ -152,8 +152,8 @@
         { id: 'leg_extension', name: 'Leg Extension', icon: '🦵', dots: 4 },
         { id: 'leg_curl', name: 'Leg Curl', icon: '🔄', dots: 4 },
         { id: 'calf_raise', name: 'Calf Raise', icon: '🦶', dots: 4 },
-        { id: 'rdl', name: 'RDL', icon: '🏋️', dots: 4 },
-        { id: 'squats', name: 'Squats', icon: '⬇️', dots: 4 },
+        { id: 'rdl', name: 'RDL', icon: '🪢', dots: 4 },
+        { id: 'squats', name: 'Squats', icon: '🏋️', dots: 4 },
       ],
     },
     arms: {
@@ -453,7 +453,6 @@
         saveData();
         updateStreakBadge(getDailySetCount());
         renderAll();
-        showToast('-1 set');
         return;
       }
     }
@@ -470,8 +469,6 @@
     clearTimeout(pushWindow.timer);
     pushWindow = null;
     renderAll();
-    const ex = findExercise(exerciseId);
-    showToast(`+1 🔥 set ${ex ? sanitize(ex.name) : ''}`);
   }
 
   function clearPushWindow() {
@@ -543,7 +540,6 @@
       saveData();
     }
     updateStreakBadge(getDailySetCount());
-    showToast(`Deleted ${name}`);
     renderAll();
   }
 
@@ -619,7 +615,7 @@
       if (isResting) row.classList.add('needs-rest');
 
       // Set group color as CSS variable for glow
-      if (isFocus) row.style.setProperty('--group-color', color);
+      row.style.setProperty('--group-color', color);
 
       row.innerHTML = `
         <span class="summary-label">${labelText}</span>
@@ -750,7 +746,6 @@
         if (longPressFired) return;
         if (e.target.closest('.card-action-btn')) return;
         logExercise(ex.id);
-        showToast(`+1 set ${sanitize(ex.name)}`);
       });
 
       // Tap action button: mark push if in push window, otherwise remove last set
@@ -964,7 +959,6 @@
         saveData();
         closeModal();
         renderAll();
-        showToast('PR removed');
         return;
       }
 
@@ -981,7 +975,6 @@
       saveData();
       closeModal();
       renderAll();
-      showToast(`PR saved: ${value}${unit ? ' ' + unit : ''}`);
     };
 
     document.getElementById('pr-save').addEventListener('click', save);
@@ -1040,7 +1033,6 @@
       saveData();
       closeModal();
       renderAll();
-      showToast(`Updated ${sanitize(newName)}`);
     };
 
     document.getElementById('edit-exercise-save').addEventListener('click', save);
@@ -1100,7 +1092,6 @@
       addCustomExercise(groupKey, name);
       closeModal();
       renderAll();
-      showToast(`Added ${sanitize(name)}`);
     };
 
     document.getElementById('add-exercise-confirm').addEventListener('click', confirm);
@@ -1116,8 +1107,6 @@
         saveData();
         closeModal();
         renderAll();
-        const ex = findExercise(id);
-        showToast(`Restored ${ex ? sanitize(ex.name) : 'exercise'}`);
       });
     });
   }
@@ -1831,7 +1820,7 @@
     {
       target: '#summary',
       title: '14-Day Volume',
-      text: 'Each bar tracks your sets over the last 14 days, colored by muscle group.',
+      text: 'Each bar tracks your sets over the last 14 days for each muscle group.',
       position: 'below',
     },
     {

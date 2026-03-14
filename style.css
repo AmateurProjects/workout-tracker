@@ -133,6 +133,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  transition: gap 0.3s ease;
 }
 
 .summary-row {
@@ -143,11 +144,12 @@ body {
   -webkit-tap-highlight-color: transparent;
   border-radius: 8px;
   padding: 10px 10px;
-  transition: background 0.15s, box-shadow 0.15s, opacity 0.35s ease, max-height 0.35s ease, padding 0.35s ease;
+  transition: background 0.15s, box-shadow 0.15s, opacity 0.35s ease, max-height 0.35s ease, padding 0.35s ease, transform 0.3s ease;
   border: 2px solid transparent;
   max-height: 60px;
   overflow: hidden;
   flex-shrink: 0;
+  will-change: opacity, max-height, transform;
 }
 
 .summary-row.faded {

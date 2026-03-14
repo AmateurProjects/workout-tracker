@@ -1061,18 +1061,76 @@
   // ===== Tab Navigation =====
   function switchToGroup(groupKey) {
     const card = document.getElementById('summary');
+    const container = document.getElementById('summary-bars');
+    const rows = container.querySelectorAll('.summary-row');
+
     if (activeGroup === groupKey) {
-      // Toggle off
+      // Toggle off — collapse exercises, then expand all rows back in
       collapseExercises();
       activeGroup = null;
       card.classList.remove('card-compact');
       renderSummary();
+      // Animate new rows in with stagger
+      const newRows = container.querySelectorAll('.summary-row');
+      newRows.forEach((row, i) => {
+        row.style.opacity = '0';
+        row.style.maxHeight = '0';
+        row.style.padding = '0 10px';
+        row.style.transition = 'none';
+        requestAnimationFrame(() => {
+          row.style.transition = 'opacity 0.3s ease, max-height 0.35s ease, padding 0.35s ease';
+          row.style.transitionDelay = (i * 40) + 'ms';
+          row.style.opacity = '1';
+          row.style.maxHeight = '60px';
+          row.style.padding = '10px 10px';
+        });
+      });
       return;
     }
-    activeGroup = groupKey;
-    card.classList.add('card-compact');
-    renderExercises();
-    renderSummary();
+
+    // Selecting a group — animate non-active rows out, then render
+    const outRows = [];
+    rows.forEach(row => {
+      if (row.dataset.group !== groupKey) outRows.push(row);
+    });
+
+    if (outRows.length === 0) {
+      // Already showing single group, just re-render
+      activeGroup = groupKey;
+      card.classList.add('card-compact');
+      renderExercises();
+      renderSummary();
+      return;
+    }
+
+    // Animate departing rows
+    outRows.forEach(row => {
+      row.style.transition = 'opacity 0.25s ease, max-height 0.3s ease, padding 0.3s ease';
+      row.style.opacity = '0';
+      row.style.maxHeight = '0';
+      row.style.padding = '0 10px';
+    });
+
+    // After animation, render the selected state
+    setTimeout(() => {
+      activeGroup = groupKey;
+      card.classList.add('card-compact');
+      renderExercises();
+      renderSummary();
+
+      // Pulse the active row in
+      const activeRow = container.querySelector('.summary-row.active');
+      if (activeRow) {
+        activeRow.style.opacity = '0';
+        activeRow.style.transform = 'scale(0.95)';
+        activeRow.style.transition = 'none';
+        requestAnimationFrame(() => {
+          activeRow.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+          activeRow.style.opacity = '1';
+          activeRow.style.transform = 'scale(1)';
+        });
+      }
+    }, 280);
   }
 
   function collapseExercises() {

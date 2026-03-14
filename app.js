@@ -833,6 +833,11 @@
     modal.classList.remove('hidden');
     document.getElementById('edit-exercise-name').focus();
 
+    // Auto-select emoji on focus so tapping it lets user type a replacement directly
+    document.getElementById('edit-exercise-icon').addEventListener('focus', function () {
+      this.select();
+    });
+
     const save = () => {
       const newName = document.getElementById('edit-exercise-name').value.trim();
       const newIcon = document.getElementById('edit-exercise-icon').value.trim();

@@ -4,7 +4,113 @@
 
   // ===== Configuration =====
   const STORAGE_KEY = 'workout_tracker_data';
+  const QUOTE_KEY = 'workout_tracker_last_quote_date';
+  const QUOTE_SEEN_KEY = 'workout_tracker_seen_quotes';
   const VOLUME_WINDOW_DAYS = 14;
+
+  // ===== Daily Inspiration =====
+  const DAILY_QUOTES = [
+    { text: 'The last three or four reps is what makes the muscle grow.', author: 'Arnold Schwarzenegger' },
+    { text: 'The only bad workout is the one that didn\'t happen.', author: 'Unknown' },
+    { text: 'Strength does not come from the physical capacity. It comes from an indomitable will.', author: 'Mahatma Gandhi' },
+    { text: 'The pain you feel today will be the strength you feel tomorrow.', author: 'Arnold Schwarzenegger' },
+    { text: 'Take care of your body. It\'s the only place you have to live.', author: 'Jim Rohn' },
+    { text: 'The clock is ticking. Are you becoming the person you want to be?', author: 'Greg Plitt' },
+    { text: 'Success usually comes to those who are too busy to be looking for it.', author: 'Henry David Thoreau' },
+    { text: 'All progress takes place outside the comfort zone.', author: 'Michael John Bobak' },
+    { text: 'The body achieves what the mind believes.', author: 'Napoleon Hill' },
+    { text: 'If something stands between you and your success, move it. Never be denied.', author: 'Dwayne Johnson' },
+    { text: 'You don\'t have to be great to start, but you have to start to be great.', author: 'Zig Ziglar' },
+    { text: 'The only place where success comes before work is in the dictionary.', author: 'Vidal Sassoon' },
+    { text: 'Once you learn to quit, it becomes a habit.', author: 'Vince Lombardi' },
+    { text: 'What hurts today makes you stronger tomorrow.', author: 'Jay Cutler' },
+    { text: 'The resistance that you fight physically in the gym and the resistance that you fight in life can only build a strong character.', author: 'Arnold Schwarzenegger' },
+    { text: 'Discipline is doing what you hate to do, but doing it like you love it.', author: 'Mike Tyson' },
+    { text: 'Your body can stand almost anything. It\'s your mind that you have to convince.', author: 'Andrew Murphy' },
+    { text: 'Don\'t count the days, make the days count.', author: 'Muhammad Ali' },
+    { text: 'I hated every minute of training, but I said, don\'t quit. Suffer now and live the rest of your life as a champion.', author: 'Muhammad Ali' },
+    { text: 'Hard work beats talent when talent doesn\'t work hard.', author: 'Tim Notke' },
+    { text: 'No pain, no gain. Shut up and train.', author: 'Ronnie Coleman' },
+    { text: 'It\'s not about having time. It\'s about making time.', author: 'Unknown' },
+    { text: 'The successful warrior is the average man, with laser-like focus.', author: 'Bruce Lee' },
+    { text: 'Be patient and tough; someday this pain will be useful to you.', author: 'Ovid' },
+    { text: 'We are what we repeatedly do. Excellence then is not an act, but a habit.', author: 'Aristotle' },
+    { text: 'Push harder than yesterday if you want a different tomorrow.', author: 'Vincent Williams Sr.' },
+    { text: 'The iron never lies to you. Two hundred pounds is always two hundred pounds.', author: 'Henry Rollins' },
+    { text: 'Motivation is what gets you started. Habit is what keeps you going.', author: 'Jim Ryun' },
+    { text: 'You miss 100% of the shots you don\'t take.', author: 'Wayne Gretzky' },
+    { text: 'Whether you think you can or you think you can\'t, you\'re right.', author: 'Henry Ford' },
+    { text: 'Everybody wants to be a bodybuilder, but nobody wants to lift no heavy weights.', author: 'Ronnie Coleman' },
+    { text: 'The difference between the impossible and the possible lies in a person\'s determination.', author: 'Tommy Lasorda' },
+    { text: 'I do not think there is any other quality so essential to success of any kind as the quality of perseverance.', author: 'John D. Rockefeller' },
+    { text: 'A champion is someone who gets up when they can\'t.', author: 'Jack Dempsey' },
+    { text: 'It never gets easier. You just get stronger.', author: 'Unknown' },
+    { text: 'If you want something you\'ve never had, you must be willing to do something you\'ve never done.', author: 'Thomas Jefferson' },
+    { text: 'The gym is not just about building a better body. It\'s about building a better you.', author: 'Unknown' },
+    { text: 'You shall gain, but you shall pay with sweat, blood, and vomit.', author: 'Pavel Tsatsouline' },
+    { text: 'To keep the body in good health is a duty. Otherwise we shall not be able to keep our mind strong and clear.', author: 'Buddha' },
+    { text: 'Training gives us an outlet for suppressed energies created by stress and thus tones the spirit just as exercise conditions the body.', author: 'Arnold Schwarzenegger' },
+    { text: 'Dead last finish is greater than did not finish, which trumps did not start.', author: 'Unknown' },
+    { text: 'Rome wasn\'t built in a day, but they worked on it every single day.', author: 'Unknown' },
+    { text: 'The only person you are destined to become is the person you decide to be.', author: 'Ralph Waldo Emerson' },
+    { text: 'Action is the foundational key to all success.', author: 'Pablo Picasso' },
+    { text: 'Energy and persistence conquer all things.', author: 'Benjamin Franklin' },
+    { text: 'Our greatest glory is not in never falling, but in rising every time we fall.', author: 'Confucius' },
+    { text: 'Champions aren\'t made in gyms. Champions are made from something they have deep inside them — a desire, a dream, a vision.', author: 'Muhammad Ali' },
+    { text: 'Obsessed is a word the lazy use to describe the dedicated.', author: 'Unknown' },
+    { text: 'When you hit failure, your workout has just begun.', author: 'Ronnie Coleman' },
+    { text: 'The purpose of training is to tighten up the slack, toughen the body, and polish the spirit.', author: 'Morihei Ueshiba' },
+    { text: 'Most people fail, not because of lack of desire, but because of lack of commitment.', author: 'Vince Lombardi' },
+    { text: 'Some people want it to happen, some wish it would happen, others make it happen.', author: 'Michael Jordan' },
+    { text: 'Today I will do what others won\'t, so tomorrow I can accomplish what others can\'t.', author: 'Jerry Rice' },
+    { text: 'The mind is the most important part of achieving any fitness goal.', author: 'Phil Heath' },
+    { text: 'You dream. You plan. You reach. There will be obstacles. There will be doubters. There will be mistakes. But with hard work, with belief, there are no limits.', author: 'Michael Phelps' },
+    { text: 'Blood, sweat, and respect. The first two you give, the last one you earn.', author: 'Dwayne Johnson' },
+    { text: 'I fear not the man who has practiced 10,000 kicks once, but I fear the man who has practiced one kick 10,000 times.', author: 'Bruce Lee' },
+    { text: 'Fitness is not about being better than someone else. It\'s about being better than you used to be.', author: 'Khloe Kardashian' },
+    { text: 'Just believe in yourself. Even if you don\'t, pretend that you do and at some point, you will.', author: 'Venus Williams' },
+    { text: 'The secret of getting ahead is getting started.', author: 'Mark Twain' },
+    { text: 'Physical fitness is the first requisite of happiness.', author: 'Joseph Pilates' },
+    { text: 'A year from now you may wish you had started today.', author: 'Karen Lamb' },
+    { text: 'When I feel tired, I just think about how great I will feel once I finally reach my goal.', author: 'Michael Phelps' },
+    { text: 'To give anything less than your best is to sacrifice the gift.', author: 'Steve Prefontaine' },
+    { text: 'Go the extra mile. It\'s never crowded.', author: 'Wayne Dyer' },
+    { text: 'Sweat is fat crying.', author: 'Unknown' },
+    { text: 'The only way to define your limits is by going beyond them.', author: 'Arthur C. Clarke' },
+    { text: 'Your health is an investment, not an expense.', author: 'Unknown' },
+    { text: 'Exercise is king. Nutrition is queen. Put them together and you\'ve got a kingdom.', author: 'Jack LaLanne' },
+    { text: 'Don\'t limit your challenges. Challenge your limits.', author: 'Jerry Dunn' },
+    { text: 'The real workout starts when you want to stop.', author: 'Ronnie Coleman' },
+    { text: 'The groundwork for all happiness is good health.', author: 'Leigh Hunt' },
+    { text: 'Never give up on a dream just because of the time it will take to accomplish it. The time will pass anyway.', author: 'Earl Nightingale' },
+    { text: 'It\'s supposed to be hard. If it were easy, everybody would do it.', author: 'Tom Hanks' },
+    { text: 'Strive for progress, not perfection.', author: 'Unknown' },
+    { text: 'Sore today. Strong tomorrow.', author: 'Unknown' },
+    { text: 'The harder the battle, the sweeter the victory.', author: 'Les Brown' },
+    { text: 'Success is walking from failure to failure with no loss of enthusiasm.', author: 'Winston Churchill' },
+    { text: 'Great works are performed not by strength but by perseverance.', author: 'Samuel Johnson' },
+    { text: 'The best time to plant a tree was 20 years ago. The second best time is now.', author: 'Chinese Proverb' },
+    { text: 'It does not matter how slowly you go as long as you do not stop.', author: 'Confucius' },
+    { text: 'You have to think it before you can do it. The mind is what makes it all possible.', author: 'Kai Greene' },
+    { text: 'Tough times don\'t last. Tough people do.', author: 'Robert Schuller' },
+    { text: 'Fall seven times, stand up eight.', author: 'Japanese Proverb' },
+    { text: 'No one ever drowned in sweat.', author: 'Lou Holtz' },
+    { text: 'The best project you\'ll ever work on is you.', author: 'Unknown' },
+    { text: 'In training, you listen to your body. In competition, you tell your body to shut up.', author: 'Rich Froning Jr.' },
+    { text: 'Suffer the pain of discipline or suffer the pain of regret.', author: 'Jim Rohn' },
+    { text: 'Your body is not a temple — it\'s an amusement park. Enjoy the ride.', author: 'Anthony Bourdain' },
+    { text: 'I don\'t stop when I\'m tired. I stop when I\'m done.', author: 'David Goggins' },
+    { text: 'You can have results or excuses, but not both.', author: 'Arnold Schwarzenegger' },
+    { text: 'Stay hungry, stay foolish.', author: 'Steve Jobs' },
+    { text: 'Think of your workouts as important meetings you scheduled with yourself.', author: 'Unknown' },
+    { text: 'Nothing will work unless you do.', author: 'Maya Angelou' },
+    { text: 'Strength doesn\'t come from what you can do. It comes from overcoming the things you once thought you couldn\'t.', author: 'Rikki Rogers' },
+    { text: 'What seems impossible today will one day become your warm-up.', author: 'Unknown' },
+    { text: 'One day or day one. You decide.', author: 'Unknown' },
+    { text: 'The pain of discipline weighs ounces. The pain of regret weighs tons.', author: 'Jim Rohn' },
+    { text: 'Be stronger than your strongest excuse.', author: 'Unknown' },
+    { text: 'Work hard in silence, let your success be your noise.', author: 'Frank Ocean' },
+  ];
 
   // ===== Exercise Definitions =====
   const MUSCLE_GROUPS = {
@@ -1382,6 +1488,45 @@
   }
 
   // ===== Init =====
+  function showDailyQuote() {
+    const today = todayStr();
+    if (localStorage.getItem(QUOTE_KEY) === today) return;
+    localStorage.setItem(QUOTE_KEY, today);
+
+    // Track seen quotes so none repeat until all 100 have been shown
+    let seen = [];
+    try { seen = JSON.parse(localStorage.getItem(QUOTE_SEEN_KEY)) || []; } catch (e) { seen = []; }
+    if (!Array.isArray(seen) || seen.length >= DAILY_QUOTES.length) seen = [];
+
+    // Pick a random unseen quote
+    const available = DAILY_QUOTES.map((_, i) => i).filter(i => !seen.includes(i));
+    const pick = available[Math.floor(Math.random() * available.length)];
+    seen.push(pick);
+    localStorage.setItem(QUOTE_SEEN_KEY, JSON.stringify(seen));
+
+    const quote = DAILY_QUOTES[pick];
+    const overlay = document.createElement('div');
+    overlay.className = 'quote-overlay';
+    overlay.innerHTML = `
+      <div class="quote-card">
+        <div class="quote-text">\u201c${quote.text}\u201d</div>
+        <div class="quote-author">\u2014 ${quote.author}</div>
+      </div>
+    `;
+    overlay.addEventListener('click', () => {
+      overlay.classList.add('quote-fade');
+      setTimeout(() => overlay.remove(), 400);
+    });
+    document.getElementById('app').appendChild(overlay);
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+      if (overlay.parentNode) {
+        overlay.classList.add('quote-fade');
+        setTimeout(() => overlay.remove(), 400);
+      }
+    }, 5000);
+  }
+
   function init() {
     initModal();
     initStreakBadge();
@@ -1418,6 +1563,9 @@
 
     // Help button
     document.getElementById('help-btn').addEventListener('click', startTutorial);
+
+    // Show daily inspirational quote (once per day)
+    showDailyQuote();
   }
 
   // ===== Settings / Import / Export =====

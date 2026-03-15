@@ -153,7 +153,7 @@ body {
 .summary-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   border-radius: 8px;
@@ -201,7 +201,7 @@ body {
 }
 
 .summary-label {
-  width: 100px;
+  width: 85px;
   font-size: 1rem;
   color: var(--text-dim);
   text-align: right;
@@ -215,11 +215,11 @@ body {
 }
 
 .summary-chevron {
-  font-size: 1.4rem;
+  font-size: 1.8rem;
   font-weight: 700;
   color: var(--text-dim);
   flex-shrink: 0;
-  width: 18px;
+  width: 14px;
   text-align: center;
   display: inline-block;
   transform: rotate(90deg);
@@ -784,11 +784,11 @@ body {
 
 /* ===== Card Chevron & Expandable Actions ===== */
 .card-chevron {
-  font-size: 1.4rem;
+  font-size: 1.8rem;
   font-weight: 700;
   color: var(--text-dim);
   flex-shrink: 0;
-  width: 18px;
+  width: 14px;
   text-align: center;
   display: inline-block;
   transform: rotate(90deg);
@@ -803,12 +803,6 @@ body {
   display: flex;
   gap: 8px;
   padding: 0 18px 14px;
-  animation: actionsSlideIn 0.2s ease;
-}
-
-@keyframes actionsSlideIn {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 
 .card-action-item {
@@ -818,6 +812,20 @@ body {
   border-radius: 10px;
   background: var(--bg);
   color: var(--text-dim);
+  opacity: 0;
+  transform: translateY(-10px) scale(0.9);
+  animation: actionBtnIn 0.3s ease forwards;
+}
+
+.card-action-item:nth-child(1) { animation-delay: 0s; }
+.card-action-item:nth-child(2) { animation-delay: 0.05s; }
+.card-action-item:nth-child(3) { animation-delay: 0.1s; }
+.card-action-item:nth-child(4) { animation-delay: 0.15s; }
+
+@keyframes actionBtnIn {
+  from { opacity: 0; transform: translateY(-10px) scale(0.9); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;

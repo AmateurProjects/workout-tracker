@@ -215,6 +215,7 @@
   if (!data.hiddenExercises) data.hiddenExercises = {};
 
   let activeGroup = null;
+  let expandedExercise = null; // track which exercise card is expanded
   let pushWindow = null; // { exerciseId, ts, timer }
   let lastCelebratedMilestone = 0; // track highest milestone celebrated this session
   let cardioCelebratedToday = false;
@@ -617,6 +618,8 @@
       // Set group color as CSS variable for glow
       row.style.setProperty('--group-color', color);
 
+      const isActive = key === activeGroup;
+      const chevron = isActive ? '▴' : '▾';
       row.innerHTML = `
         <span class="summary-label">${labelText}</span>
         <div class="summary-bar-track">
@@ -624,6 +627,7 @@
           ${pushVol > 0 ? `<div class="summary-bar-push" style="width:${pushPct}%"></div>` : ''}
           <span class="summary-bar-value">${vol} / ${target}</span>
         </div>
+        <span class="summary-chevron">${chevron}</span>
       `;
       row.addEventListener('click', (e) => {
         if (e.target.closest('.target-btn')) return;
@@ -698,22 +702,12 @@
         metaHtml = `<span class="${freshnessClass(ago)}">${daysAgoLabel(ago)}</span>`;
       }
 
-      // Check if push window is active for this exercise
-      const hasPushWindow = pushWindow && pushWindow.exerciseId === ex.id;
-
-      const isCustom = ex.id.startsWith('custom_');
-
-      // Action button: shows 🔥 during push window, − when sets exist, hidden otherwise
-      let actionBtnHtml = '';
-      if (hasPushWindow) {
-        actionBtnHtml = `<button class="card-action-btn card-action-push" data-exercise="${ex.id}" aria-label="Mark as heavy set">🔥</button>`;
-      } else if (todaySets > 0) {
-        actionBtnHtml = `<button class="card-action-btn" data-exercise="${ex.id}" aria-label="Remove last set">−</button>`;
-      }
-
       // PR badge if one exists
       const pr = data.personalRecords && data.personalRecords[ex.id];
       const prBadgeHtml = pr ? `<span class="pr-badge">PR: ${sanitize(pr.value)}${pr.unit ? ' ' + sanitize(pr.unit) : ''}</span>` : '';
+
+      const isExpanded = expandedExercise === ex.id;
+      const chevron = isExpanded ? '▴' : '▾';
 
       card.innerHTML = `
         <div class="card-inner">
@@ -723,41 +717,52 @@
             <div class="exercise-meta">${metaHtml}</div>
           </div>
           <div class="exercise-sets">${dotsHtml}</div>
-          ${actionBtnHtml}
+          <span class="card-chevron">${chevron}</span>
         </div>
+        ${isExpanded ? `<div class="card-actions">
+          <button class="card-action-item card-action-add" data-exercise="${ex.id}">＋ Set</button>
+          <button class="card-action-item card-action-heavy" data-exercise="${ex.id}">🔥 Heavy</button>
+          <button class="card-action-item card-action-remove" data-exercise="${ex.id}">− Undo</button>
+          <button class="card-action-item card-action-options" data-exercise="${ex.id}">✏️ More</button>
+        </div>` : ''}
       `;
 
-      // Long-press to show options menu
-      let longPressTimer = null;
-      let longPressFired = false;
-      const inner = card.querySelector('.card-inner');
-      inner.addEventListener('touchstart', (e) => {
-        longPressFired = false;
-        longPressTimer = setTimeout(() => {
-          longPressFired = true;
-          showExerciseOptions(ex.id, activeGroup);
-        }, 500);
-      }, { passive: true });
-      inner.addEventListener('touchend', () => { clearTimeout(longPressTimer); }, { passive: true });
-      inner.addEventListener('touchmove', () => { clearTimeout(longPressTimer); }, { passive: true });
-
-      // Tap on card body to log 1 set
-      card.querySelector('.card-inner').addEventListener('click', (e) => {
-        if (longPressFired) return;
-        if (e.target.closest('.card-action-btn')) return;
-        logExercise(ex.id);
+      // Tap on card header to toggle expand/collapse
+      card.querySelector('.card-inner').addEventListener('click', () => {
+        expandedExercise = expandedExercise === ex.id ? null : ex.id;
+        skipAnimation = true;
+        renderExercises();
+        skipAnimation = false;
       });
 
-      // Tap action button: mark push if in push window, otherwise remove last set
-      const actionBtn = card.querySelector('.card-action-btn');
-      if (actionBtn) {
-        actionBtn.addEventListener('click', (e) => {
+      // Action button handlers (only when expanded)
+      if (isExpanded) {
+        card.querySelector('.card-action-add').addEventListener('click', (e) => {
           e.stopPropagation();
-          if (hasPushWindow) {
-            markLastSetAsPush(ex.id);
-          } else {
-            removeLastTodaySet(ex.id);
+          logExercise(ex.id);
+        });
+        card.querySelector('.card-action-heavy').addEventListener('click', (e) => {
+          e.stopPropagation();
+          logExercise(ex.id);
+          // Immediately mark as push
+          const logs = data.logs[ex.id] || [];
+          const last = logs[logs.length - 1];
+          if (last && last.date === todayStr()) {
+            last.push = true;
+            saveData();
           }
+          if (pushWindow) { clearTimeout(pushWindow.timer); pushWindow = null; }
+          skipAnimation = true;
+          renderExercises();
+          skipAnimation = false;
+        });
+        card.querySelector('.card-action-remove').addEventListener('click', (e) => {
+          e.stopPropagation();
+          removeLastTodaySet(ex.id);
+        });
+        card.querySelector('.card-action-options').addEventListener('click', (e) => {
+          e.stopPropagation();
+          showExerciseOptions(ex.id, activeGroup);
         });
       }
 
@@ -1392,6 +1397,7 @@
 
   // ===== Group Navigation & Animations =====
   function switchToGroup(groupKey) {
+    expandedExercise = null; // collapse any expanded card
     const card = document.getElementById('summary');
     const container = document.getElementById('summary-bars');
     const rows = container.querySelectorAll('.summary-row');
@@ -1507,13 +1513,6 @@
       setTimeout(() => overlay.remove(), 400);
     });
     document.getElementById('app').appendChild(overlay);
-    // Auto-dismiss after 5 seconds
-    setTimeout(() => {
-      if (overlay.parentNode) {
-        overlay.classList.add('quote-fade');
-        setTimeout(() => overlay.remove(), 400);
-      }
-    }, 5000);
   }
 
   function init() {
@@ -1847,22 +1846,8 @@
     },
     {
       target: '.exercise-card',
-      title: 'Log a Set',
-      text: 'Tap any exercise card to add 1 set.',
-      position: 'above',
-      fallback: true,
-    },
-    {
-      target: '.card-action-btn',
-      title: 'Remove / Heavy Set',
-      text: 'Tap − to undo your last set. After logging, it briefly shows 🔥 — tap it to mark as extra effort.',
-      position: 'above',
-      fallback: true,
-    },
-    {
-      target: '.exercise-card',
-      title: 'Exercise Options',
-      text: 'Long-press any exercise for options: Edit, Delete, or set a Personal Record.',
+      title: 'Exercise Actions',
+      text: 'Tap any exercise to expand it. You\'ll see buttons for adding sets, heavy sets, undoing, and more options.',
       position: 'above',
       fallback: true,
     },

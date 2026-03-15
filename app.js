@@ -1280,9 +1280,11 @@
     const overlay = document.createElement('div');
     overlay.className = 'celebrate-overlay';
 
-    // Gold shimmer banner with group name
+    // Gold banner with group name
     const banner = document.createElement('div');
-    banner.className = 'celebrate-banner banner-gold banner-glow';
+    banner.className = 'celebrate-banner';
+    banner.style.color = '#fbbf24';
+    banner.style.textShadow = '0 2px 20px rgba(251,191,36,0.7), 0 0 40px rgba(251,191,36,0.4)';
     banner.textContent = `${group.icon} ${group.label} Goal Reached!`;
     overlay.appendChild(banner);
 
@@ -1808,9 +1810,6 @@
     // Settings gear
     document.getElementById('settings-btn').addEventListener('click', openSettings);
 
-    // Help button
-    document.getElementById('help-btn').addEventListener('click', startTutorial);
-
     // Show daily inspirational quote (once per day)
     showDailyQuote();
   }
@@ -2072,212 +2071,5 @@
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
-  }
-
-  // ===== Tutorial Walkthrough =====
-  const TUTORIAL_STEPS = [
-    {
-      target: '#summary',
-      title: '14-Day Volume',
-      text: 'Each bar tracks your sets over the last 14 days for each muscle group.',
-      position: 'below',
-    },
-    {
-      target: '.summary-row',
-      title: 'Select a Group',
-      text: 'Tap a muscle group to see its exercises.',
-      position: 'below',
-      action: 'openGroup',
-    },
-    {
-      target: '.target-stepper-row',
-      title: 'Adjust Your Goal',
-      text: 'Use +/− to change the 14-day set target.',
-      position: 'below',
-      fallback: true,
-    },
-    {
-      target: '.exercise-card-add',
-      title: 'Custom Exercises',
-      text: 'Add your own exercises to any group.',
-      position: 'above',
-      fallback: true,
-    },
-    {
-      target: '#settings-btn',
-      title: 'Settings ⚙️',
-      text: 'Edit history, backup, import, or clear data.',
-      position: 'below',
-    },
-    {
-      target: '#help-btn',
-      title: 'You\'re All Set! 💪',
-      text: 'Tap ❓ anytime to replay this guide.',
-      position: 'below',
-    },
-  ];
-
-  let tutorialStep = 0;
-  let tutorialOverlay = null;
-
-  function startTutorial() {
-    // Start from overview — collapse any expanded groups
-    if (expandedGroups.size > 0) {
-      expandedGroups.clear();
-      expandedExercise = null;
-      renderSummary();
-    }
-    tutorialStep = 0;
-    showTutorialStep();
-  }
-
-  function showTutorialStep() {
-    // Clean up previous overlay
-    if (tutorialOverlay) tutorialOverlay.remove();
-    if (tutorialStep >= TUTORIAL_STEPS.length) {
-      endTutorial();
-      return;
-    }
-
-    const step = TUTORIAL_STEPS[tutorialStep];
-    // Action: open a group for exercise-related steps
-    if (step.action === 'openGroup' && !expandedGroups.has('back')) {
-      expandedGroups.add('back');
-      renderSummary();
-    }
-
-    let targetEl = document.querySelector(step.target);
-
-    // Try fallback selector if primary doesn't exist
-    if (!targetEl && step.fallbackTarget) {
-      targetEl = document.querySelector(step.fallbackTarget);
-    }
-
-    // If target doesn't exist (e.g. no exercises rendered), skip
-    if (!targetEl && step.fallback) {
-      tutorialStep++;
-      showTutorialStep();
-      return;
-    }
-    if (!targetEl) targetEl = document.getElementById('app');
-
-    // Ensure target is visible in the viewport
-    targetEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
-    // Small delay to let scroll settle before measuring
-    requestAnimationFrame(() => { positionTutorial(targetEl, step); });
-  }
-
-  function positionTutorial(targetEl, step) {
-    const rect = targetEl.getBoundingClientRect();
-    const pad = 8;
-
-    // Build overlay
-    const overlay = document.createElement('div');
-    overlay.className = 'tutorial-overlay';
-
-    // Transparent backdrop (click handler only)
-    const backdrop = document.createElement('div');
-    backdrop.className = 'tutorial-backdrop';
-    backdrop.style.background = 'transparent';
-    overlay.appendChild(backdrop);
-
-    // Spotlight cutout
-    const spotlight = document.createElement('div');
-    spotlight.className = 'tutorial-spotlight';
-    spotlight.style.top = (rect.top - pad) + 'px';
-    spotlight.style.left = (rect.left - pad) + 'px';
-    spotlight.style.width = (rect.width + pad * 2) + 'px';
-    spotlight.style.height = (rect.height + pad * 2) + 'px';
-    overlay.appendChild(spotlight);
-
-    // Tooltip
-    const tooltip = document.createElement('div');
-    tooltip.className = 'tutorial-tooltip';
-
-    // Progress dots
-    let dotsHtml = '<div class="tutorial-dots">';
-    for (let i = 0; i < TUTORIAL_STEPS.length; i++) {
-      dotsHtml += `<div class="tutorial-dot${i === tutorialStep ? ' active' : ''}"></div>`;
-    }
-    dotsHtml += '</div>';
-
-    const isLast = tutorialStep === TUTORIAL_STEPS.length - 1;
-    tooltip.innerHTML = `
-      <div class="tutorial-title">${step.title}</div>
-      <div class="tutorial-text">${step.text}</div>
-      <div class="tutorial-footer">
-        ${dotsHtml}
-        <div style="display:flex;gap:10px;align-items:center">
-          ${!isLast ? '<button class="tutorial-skip">Skip</button>' : ''}
-          <button class="tutorial-next">${isLast ? 'Done' : 'Next'}</button>
-        </div>
-      </div>
-    `;
-
-    // Position tooltip
-    overlay.appendChild(tooltip);
-    document.body.appendChild(overlay);
-    tutorialOverlay = overlay;
-
-    // Calculate position after it's in DOM
-    const tooltipRect = tooltip.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    let tooltipLeft = Math.max(16, Math.min(rect.left + rect.width / 2 - tooltipRect.width / 2, vw - tooltipRect.width - 16));
-
-    let tooltipTop;
-    if (step.position === 'below') {
-      tooltipTop = rect.bottom + pad + 12;
-      // If it would overflow the bottom, flip above
-      if (tooltipTop + tooltipRect.height > vh - 16) {
-        tooltipTop = rect.top - pad - 12 - tooltipRect.height;
-      }
-    } else {
-      tooltipTop = rect.top - pad - 12 - tooltipRect.height;
-      // If it would overflow the top, flip below
-      if (tooltipTop < 16) {
-        tooltipTop = rect.bottom + pad + 12;
-      }
-    }
-    // Final clamp to viewport
-    tooltipTop = Math.max(16, Math.min(tooltipTop, vh - tooltipRect.height - 16));
-    tooltip.style.top = tooltipTop + 'px';
-    tooltip.style.left = tooltipLeft + 'px';
-
-    // Event handlers
-    tooltip.querySelector('.tutorial-next').addEventListener('click', (e) => {
-      e.stopPropagation();
-      tutorialStep++;
-      showTutorialStep();
-    });
-
-    const skipBtn = tooltip.querySelector('.tutorial-skip');
-    if (skipBtn) {
-      skipBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        endTutorial();
-      });
-    }
-
-    // Tap backdrop to advance
-    backdrop.addEventListener('click', () => {
-      tutorialStep++;
-      showTutorialStep();
-    });
-  }
-
-  function endTutorial() {
-    if (tutorialOverlay) {
-      tutorialOverlay.remove();
-      tutorialOverlay = null;
-    }
-    tutorialStep = 0;
-    // Return to initial state — collapse all groups
-    if (expandedGroups.size > 0) {
-      expandedGroups.clear();
-      expandedExercise = null;
-      renderSummary();
-    }
   }
 })();

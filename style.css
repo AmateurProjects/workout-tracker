@@ -120,6 +120,13 @@ body {
   overflow: hidden;
 }
 
+/* ===== Group Exercises (accordion) ===== */
+.group-exercises {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .card h2 {
   font-size: 1rem;
   text-transform: uppercase;

@@ -214,7 +214,8 @@
   if (!data.exerciseOverrides) data.exerciseOverrides = {};
   if (!data.hiddenExercises) data.hiddenExercises = {};
 
-  let activeGroup = null;
+  let expandedGroups = new Set(); // track which muscle groups are expanded
+  let animatingGroups = new Set(); // guard against rapid taps during animation
   let expandedExercise = null; // track which exercise card is expanded
   let skipActionAnim = false; // suppress action button animation on re-render
   let pushWindow = null; // { exerciseId, ts, timer }
@@ -477,10 +478,8 @@
     if (!pushWindow) return;
     clearTimeout(pushWindow.timer);
     pushWindow = null;
-    skipAnimation = true;
     skipActionAnim = true;
-    renderExercises();
-    skipAnimation = false;
+    renderSummary();
     skipActionAnim = false;
   }
 
@@ -547,15 +546,10 @@
   }
 
   // ===== Rendering =====
-  let skipAnimation = false; // Suppress card entrance animations during bulk re-renders
 
   function renderAll() {
     renderDate();
     renderSummary();
-    // Skip entrance animations when re-rendering after data changes
-    skipAnimation = true;
-    renderExercises();
-    skipAnimation = false;
   }
 
   function renderDate() {
@@ -585,17 +579,12 @@
     const groupKeys = Object.keys(MUSCLE_GROUPS);
     const priorities = getGroupPriorities();
 
-    // Rank groups by score (descending) — only non-active view
     const ranked = groupKeys
       .map(k => ({ key: k, ...priorities[k] }))
       .sort((a, b) => b.score - a.score);
     const topKey = ranked[0] ? ranked[0].key : null;
-    const focusKeys = new Set(ranked.slice(0, 2).filter(r => r.score > 0).map(r => r.key));
 
     for (const key of groupKeys) {
-      // When a group is active, only render that group
-      if (activeGroup && key !== activeGroup) continue;
-
       const group = MUSCLE_GROUPS[key];
       const target = getTarget(key);
       const { total: vol, pushed: pushVol } = getGroupStats14Days(key);
@@ -604,25 +593,23 @@
       const pushPct = target > 0 ? Math.min((pushVol / target) * 100, 100) : 0;
 
       const pri = priorities[key];
-      const isFocus = !activeGroup && focusKeys.has(key);
-      const isTop = !activeGroup && key === topKey && pri.score > 0;
-      const isResting = !activeGroup && pri.trainedToday && pri.deficit <= 0;
+      const isTop = key === topKey && pri.score > 0;
+      const isResting = pri.trainedToday && pri.deficit <= 0;
+      const isExpanded = expandedGroups.has(key);
 
       const labelText = (isTop ? '🎯 ' : '') + group.label;
 
       const row = document.createElement('div');
       row.className = 'summary-row';
       row.dataset.group = key;
-      if (key === activeGroup) row.classList.add('active');
+      if (isExpanded) row.classList.add('active');
       if (isTop) row.classList.add('focus-glow');
       if (isResting) row.classList.add('needs-rest');
 
-      // Set group color as CSS variable for glow
       row.style.setProperty('--group-color', color);
 
-      const isActive = key === activeGroup;
       row.innerHTML = `
-        <span class="summary-chevron${isActive ? ' open' : ''}">›</span>
+        <span class="summary-chevron${isExpanded ? ' open' : ''}">›</span>
         <span class="summary-label">${labelText}</span>
         <div class="summary-bar-track">
           <div class="summary-bar-fill" style="width:${fillPct}%;background:${color}"></div>
@@ -632,48 +619,50 @@
       `;
       row.addEventListener('click', (e) => {
         if (e.target.closest('.target-btn')) return;
-        if (activeGroup) {
-          switchToGroup(activeGroup); // toggles off
-        } else {
-          switchToGroup(key);
-        }
+        switchToGroup(key);
       });
 
       container.appendChild(row);
 
-      // Add stepper row below active bar
-      if (key === activeGroup) {
-        const stepperRow = document.createElement('div');
-        stepperRow.className = 'target-stepper-row';
-        stepperRow.innerHTML = `
-          <span class="target-label">14-Day Goal</span>
-          <button class="target-btn" data-dir="-1" aria-label="Decrease target">&minus;</button>
-          <span class="target-value">${target}</span>
-          <button class="target-btn" data-dir="1" aria-label="Increase target">&plus;</button>
-        `;
-        stepperRow.querySelectorAll('.target-btn').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const dir = parseInt(btn.dataset.dir, 10);
-            const newTarget = Math.max(1, getTarget(key) + dir);
-            setTarget(key, newTarget);
-            renderSummary();
-          });
-        });
+      // If expanded, add stepper + exercises inline
+      if (isExpanded) {
+        const stepperRow = buildStepperRow(key, target);
         container.appendChild(stepperRow);
+
+        const exContainer = buildExerciseContainer(key);
+        container.appendChild(exContainer);
       }
     }
   }
 
-  function renderExercises() {
-    const container = document.getElementById('exercises');
-    container.innerHTML = '';
+  function buildStepperRow(groupKey, target) {
+    const stepperRow = document.createElement('div');
+    stepperRow.className = 'target-stepper-row';
+    stepperRow.dataset.group = groupKey;
+    stepperRow.innerHTML = `
+      <span class="target-label">14-Day Goal</span>
+      <button class="target-btn" data-dir="-1" aria-label="Decrease target">&minus;</button>
+      <span class="target-value">${target}</span>
+      <button class="target-btn" data-dir="1" aria-label="Increase target">&plus;</button>
+    `;
+    stepperRow.querySelectorAll('.target-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const dir = parseInt(btn.dataset.dir, 10);
+        const newTarget = Math.max(1, getTarget(groupKey) + dir);
+        setTarget(groupKey, newTarget);
+        renderSummary();
+      });
+    });
+    return stepperRow;
+  }
 
-    const group = MUSCLE_GROUPS[activeGroup];
-    if (!group) return;
+  function buildExerciseContainer(groupKey) {
+    const exContainer = document.createElement('div');
+    exContainer.className = 'group-exercises';
+    exContainer.dataset.group = groupKey;
 
-    let idx = 0;
-    const exercises = getGroupExercises(activeGroup);
+    const exercises = getGroupExercises(groupKey);
     for (const ex of exercises) {
       const todayLogs = getTodayLogs(ex.id);
       const todaySets = todayLogs.length;
@@ -681,11 +670,10 @@
       const ago = lastDate ? daysAgo(lastDate) : null;
 
       const card = document.createElement('div');
-      card.className = `exercise-card group-${activeGroup}`;
+      card.className = `exercise-card group-${groupKey}`;
       const withinWindow = lastDate && ago < VOLUME_WINDOW_DAYS;
       if (withinWindow) card.classList.add(freshnessClass(ago));
 
-      // Build set dots — each dot = 1 set today, pushed sets get gold
       const dotCount = ex.dots;
       let dotsHtml = '';
       for (let i = 0; i < dotCount; i++) {
@@ -697,21 +685,19 @@
         }
       }
 
-      // Build meta
       let metaHtml = '';
       if (withinWindow) {
         metaHtml = `<span class="${freshnessClass(ago)}">${daysAgoLabel(ago)}</span>`;
       }
 
-      // PR badge if one exists
       const pr = data.personalRecords && data.personalRecords[ex.id];
       const prBadgeHtml = pr ? `<span class="pr-badge">PR: ${sanitize(pr.value)}${pr.unit ? ' ' + sanitize(pr.unit) : ''}</span>` : '';
 
-      const isExpanded = expandedExercise === ex.id;
+      const isExerciseExpanded = expandedExercise === ex.id;
 
       card.innerHTML = `
         <div class="card-inner">
-          <span class="card-chevron${isExpanded ? ' open' : ''}">›</span>
+          <span class="card-chevron${isExerciseExpanded ? ' open' : ''}">›</span>
           <div class="exercise-icon">${ex.icon}</div>
           <div class="exercise-info">
             <div class="exercise-name">${sanitize(ex.name)}</div>
@@ -720,7 +706,7 @@
           </div>
           <div class="exercise-sets">${dotsHtml}</div>
         </div>
-        ${isExpanded ? `<div class="card-actions${skipActionAnim ? ' no-animate' : ''}">
+        ${isExerciseExpanded ? `<div class="card-actions${skipActionAnim ? ' no-animate' : ''}">
           <button class="card-action-item card-action-add" data-exercise="${ex.id}">＋ Set</button>
           <button class="card-action-item card-action-heavy" data-exercise="${ex.id}">🔥 Heavy</button>
           <button class="card-action-item card-action-remove" data-exercise="${ex.id}">− Undo</button>
@@ -731,11 +717,9 @@
       // Tap on card header to toggle expand/collapse
       card.querySelector('.card-inner').addEventListener('click', () => {
         if (expandedExercise === ex.id) {
-          // Collapsing — animate buttons out right-to-left, then fold row up
           const actions = card.querySelector('.card-actions');
           if (actions) {
             const btns = Array.from(actions.querySelectorAll('.card-action-item'));
-            // Cascade buttons out from right to left
             btns.reverse().forEach((btn, i) => {
               btn.style.transition = 'none';
               btn.style.opacity = '1';
@@ -747,11 +731,10 @@
                 btn.style.transform = 'translateY(-8px) scale(0.85)';
               }, i * 45);
             });
-            // After buttons disappear, fold the row up
             const foldDelay = btns.length * 45 + 160;
             setTimeout(() => {
               actions.style.maxHeight = actions.scrollHeight + 'px';
-              actions.offsetHeight; // force layout
+              actions.offsetHeight;
               actions.classList.add('collapsing');
               actions.style.maxHeight = '0';
               actions.style.padding = '0 18px';
@@ -759,9 +742,7 @@
             }, foldDelay);
             setTimeout(() => {
               expandedExercise = null;
-              skipAnimation = true;
-              renderExercises();
-              skipAnimation = false;
+              renderSummary();
             }, foldDelay + 200);
             return;
           }
@@ -769,17 +750,14 @@
         } else {
           expandedExercise = ex.id;
         }
-        skipAnimation = true;
-        renderExercises();
-        skipAnimation = false;
+        renderSummary();
       });
 
-      // Action button handlers (only when expanded)
-      if (isExpanded) {
+      // Action button handlers
+      if (isExerciseExpanded) {
         card.querySelector('.card-action-add').addEventListener('click', (e) => {
           e.stopPropagation();
           popBtn(e.currentTarget);
-          // Log immediately so dots update, delay full re-render for button pop
           if (!data.logs[ex.id]) data.logs[ex.id] = [];
           const entry = { date: todayStr(), ts: Date.now() };
           data.logs[ex.id].push(entry);
@@ -796,7 +774,6 @@
         card.querySelector('.card-action-heavy').addEventListener('click', (e) => {
           e.stopPropagation();
           popBtn(e.currentTarget);
-          // Log + mark push immediately
           if (!data.logs[ex.id]) data.logs[ex.id] = [];
           const entry = { date: todayStr(), ts: Date.now(), push: true };
           data.logs[ex.id].push(entry);
@@ -805,16 +782,13 @@
           flashDots(card, ex.id);
           setTimeout(() => {
             skipActionAnim = true;
-            skipAnimation = true;
             renderAll();
-            skipAnimation = false;
             skipActionAnim = false;
           }, 180);
         });
         card.querySelector('.card-action-remove').addEventListener('click', (e) => {
           e.stopPropagation();
           popBtn(e.currentTarget);
-          // Remove last today set immediately
           const today = todayStr();
           const logs = data.logs[ex.id] || [];
           for (let ri = logs.length - 1; ri >= 0; ri--) {
@@ -831,21 +805,17 @@
           e.stopPropagation();
           popBtn(e.currentTarget);
           setTimeout(() => {
-            showExerciseOptions(ex.id, activeGroup);
+            showExerciseOptions(ex.id, groupKey);
           }, 180);
         });
       }
 
-      container.appendChild(card);
-
-      // Animate entrance based on group
-      animateCardIn(card, activeGroup, idx);
-      idx++;
+      exContainer.appendChild(card);
     }
 
-    // "Add Exercise" card at the bottom
+    // "Add Exercise" card
     const addCard = document.createElement('div');
-    addCard.className = `exercise-card exercise-card-add group-${activeGroup}`;
+    addCard.className = `exercise-card exercise-card-add group-${groupKey}`;
     addCard.innerHTML = `
       <div class="exercise-icon">➕</div>
       <div class="exercise-info">
@@ -853,21 +823,11 @@
       </div>
     `;
     addCard.addEventListener('click', () => {
-      promptAddExercise(activeGroup);
+      promptAddExercise(groupKey);
     });
-    container.appendChild(addCard);
-    animateCardIn(addCard, activeGroup, idx);
-  }
+    exContainer.appendChild(addCard);
 
-  function animateCardIn(card, groupKey, index) {
-    if (skipAnimation) return;
-    card.style.opacity = '0';
-    card.style.transform = 'translateY(80px)';
-    setTimeout(() => {
-      card.style.transition = 'opacity 0.35s ease, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1)';
-      card.style.opacity = '1';
-      card.style.transform = 'translateY(0)';
-    }, index * 55);
+    return exContainer;
   }
 
   // ===== Exercise Options Menu =====
@@ -1434,107 +1394,149 @@
 
   // ===== Group Navigation & Animations =====
   function switchToGroup(groupKey) {
-    expandedExercise = null; // collapse any expanded card
-    const card = document.getElementById('summary');
-    const container = document.getElementById('summary-bars');
-    const rows = container.querySelectorAll('.summary-row');
-
-    if (activeGroup === groupKey) {
-      // Toggle off — collapse exercises first, then expand summary rows after
-      const collapseTime = collapseExercises();
-      setTimeout(() => {
-        activeGroup = null;
-        card.classList.remove('card-compact');
-        renderSummary();
-        // Animate new rows in with stagger
-        const newRows = container.querySelectorAll('.summary-row');
-        newRows.forEach((row, i) => {
-          row.style.opacity = '0';
-          row.style.maxHeight = '0';
-          row.style.padding = '0 10px';
-          row.style.transition = 'none';
-          requestAnimationFrame(() => {
-            row.style.transition = 'opacity 0.3s ease, max-height 0.35s ease, padding 0.35s ease';
-            row.style.transitionDelay = (i * 40) + 'ms';
-            row.style.opacity = '1';
-            row.style.maxHeight = '60px';
-            row.style.padding = '10px 10px';
-          });
-        });
-      }, collapseTime);
-      return;
+    if (animatingGroups.has(groupKey)) return;
+    if (expandedGroups.has(groupKey)) {
+      collapseGroup(groupKey);
+    } else {
+      expandGroup(groupKey);
     }
-
-    // Selecting a group — animate non-active rows out, then render
-    const outRows = [];
-    rows.forEach(row => {
-      if (row.dataset.group !== groupKey) outRows.push(row);
-    });
-
-    if (outRows.length === 0) {
-      // Already showing single group, just re-render
-      activeGroup = groupKey;
-      card.classList.add('card-compact');
-      renderExercises();
-      renderSummary();
-      return;
-    }
-
-    // Animate departing rows
-    card.classList.add('card-compact');
-    const activeRow = container.querySelector(`.summary-row[data-group="${groupKey}"]`);
-    outRows.forEach(row => {
-      row.style.transition = 'opacity 0.25s ease, max-height 0.3s ease, padding 0.3s ease';
-      row.style.opacity = '0';
-      row.style.maxHeight = '0';
-      row.style.padding = '0 10px';
-    });
-
-    // After animation, render the selected state
-    setTimeout(() => {
-      // Remove departed rows but keep the active one to prevent flash
-      outRows.forEach(row => row.remove());
-      activeGroup = groupKey;
-      renderExercises();
-      // Remove the old active row's transition so it doesn't flash during rebuild
-      if (activeRow) activeRow.style.transition = 'none';
-      renderSummary();
-      // The rebuilt active row should also have no transition on first paint
-      const newActive = container.querySelector('.summary-row.active');
-      if (newActive) {
-        newActive.style.transition = 'none';
-        requestAnimationFrame(() => { newActive.style.transition = ''; });
-      }
-    }, 280);
   }
 
-  function collapseExercises() {
-    const container = document.getElementById('exercises');
-    const cards = Array.from(container.querySelectorAll('.exercise-card'));
+  function expandGroup(groupKey) {
+    expandedGroups.add(groupKey);
+    expandedExercise = null;
+    animatingGroups.add(groupKey);
+
+    const container = document.getElementById('summary-bars');
+    const row = container.querySelector(`.summary-row[data-group="${groupKey}"]`);
+    if (!row) { animatingGroups.delete(groupKey); return; }
+
+    // Update row styling immediately
+    row.classList.add('active');
+    const chevron = row.querySelector('.summary-chevron');
+    if (chevron) chevron.classList.add('open');
+
+    // Build stepper
+    const target = getTarget(groupKey);
+    const stepperRow = buildStepperRow(groupKey, target);
+
+    // Build exercise container
+    const exContainer = buildExerciseContainer(groupKey);
+
+    // Find insertion point — after the row
+    row.insertAdjacentElement('afterend', stepperRow);
+    stepperRow.insertAdjacentElement('afterend', exContainer);
+
+    // Animate stepper in
+    stepperRow.style.opacity = '0';
+    stepperRow.style.overflow = 'hidden';
+    stepperRow.style.height = 'auto';
+    const stepperNatHeight = stepperRow.offsetHeight;
+    stepperRow.style.height = '0';
+    void stepperRow.offsetHeight;
+    stepperRow.style.transition = 'height 0.25s ease-out, opacity 0.2s ease';
+    stepperRow.style.height = stepperNatHeight + 'px';
+    stepperRow.style.opacity = '1';
+    setTimeout(() => {
+      stepperRow.style.height = '';
+      stepperRow.style.overflow = '';
+      stepperRow.style.transition = '';
+    }, 300);
+
+    // Animate exercise cards — staggered top to bottom
+    const cards = Array.from(exContainer.querySelectorAll('.exercise-card'));
+    cards.forEach(card => { card.style.display = 'none'; });
+
+    cards.forEach((card, i) => {
+      setTimeout(() => {
+        card.style.display = '';
+        card.style.minHeight = '0';
+        card.style.opacity = '0';
+        const naturalHeight = card.offsetHeight;
+        card.style.overflow = 'hidden';
+        card.style.height = '0';
+        void card.offsetHeight;
+        card.style.transition = 'height 0.3s ease-out, opacity 0.25s ease';
+        card.style.height = naturalHeight + 'px';
+        card.style.opacity = '1';
+      }, i * 60 + 80);
+
+      setTimeout(() => {
+        card.style.height = '';
+        card.style.overflow = '';
+        card.style.transition = '';
+        card.style.minHeight = '';
+      }, i * 60 + 80 + 350);
+    });
+
+    const totalTime = cards.length * 60 + 80 + 350;
+    setTimeout(() => {
+      animatingGroups.delete(groupKey);
+    }, totalTime);
+  }
+
+  function collapseGroup(groupKey) {
+    expandedGroups.delete(groupKey);
+    expandedExercise = null;
+    animatingGroups.add(groupKey);
+
+    const container = document.getElementById('summary-bars');
+    const row = container.querySelector(`.summary-row[data-group="${groupKey}"]`);
+    const exContainer = container.querySelector(`.group-exercises[data-group="${groupKey}"]`);
+    const stepperRow = container.querySelector(`.target-stepper-row[data-group="${groupKey}"]`);
+
+    // Update row styling
+    if (row) {
+      row.classList.remove('active');
+      const chevron = row.querySelector('.summary-chevron');
+      if (chevron) chevron.classList.remove('open');
+    }
+
+    if (!exContainer) {
+      if (stepperRow) stepperRow.remove();
+      animatingGroups.delete(groupKey);
+      return;
+    }
+
+    // Animate cards out — bottom to top
+    const cards = Array.from(exContainer.querySelectorAll('.exercise-card'));
     const last = cards.length - 1;
-    // Switch from gap to margin so spacing can collapse per-card
-    container.style.gap = '0';
+
     cards.forEach(card => {
       card.style.height = card.offsetHeight + 'px';
+      card.style.overflow = 'hidden';
       card.style.minHeight = '0';
-      card.style.marginBottom = '10px';
     });
-    // Cascade from bottom card to top — each folds up into nothing
+
     cards.forEach((card, i) => {
       const delay = (last - i) * 60;
       setTimeout(() => {
-        card.style.transition = 'height 0.28s cubic-bezier(0.55, 0, 0.78, 0), opacity 0.2s ease, margin-bottom 0.28s ease';
+        card.style.transition = 'height 0.28s ease-in, opacity 0.2s ease';
         card.style.height = '0';
         card.style.opacity = '0';
-        card.style.marginBottom = '0';
       }, delay);
+      setTimeout(() => {
+        card.style.display = 'none';
+      }, delay + 280);
     });
-    const totalTime = (last * 60) + 300;
+
+    const totalTime = last * 60 + 300;
+
+    // Collapse stepper near the end
+    if (stepperRow) {
+      setTimeout(() => {
+        stepperRow.style.overflow = 'hidden';
+        stepperRow.style.transition = 'height 0.25s ease-in, opacity 0.2s ease';
+        stepperRow.style.height = '0';
+        stepperRow.style.opacity = '0';
+      }, Math.max(0, totalTime - 150));
+    }
+
     setTimeout(() => {
-      container.innerHTML = '';
-      container.style.gap = '';
-    }, totalTime);
-    return totalTime;
+      if (exContainer.parentElement) exContainer.remove();
+      if (stepperRow && stepperRow.parentElement) stepperRow.remove();
+      animatingGroups.delete(groupKey);
+    }, totalTime + 200);
   }
 
   // ===== Init =====
@@ -1590,15 +1592,10 @@
     renderDate();
     renderSummary();
 
-    // Tap anywhere on the summary card (except bars/buttons) to deselect
+    // Tap empty areas of summary card — no-op in accordion layout
     document.getElementById('summary').addEventListener('click', (e) => {
-      if (e.target.closest('.summary-row') || e.target.closest('.target-stepper-row')) return;
-      if (activeGroup) {
-        collapseExercises();
-        activeGroup = null;
-        document.getElementById('summary').classList.remove('card-compact');
-        renderSummary();
-      }
+      if (e.target.closest('.summary-row') || e.target.closest('.target-stepper-row') ||
+          e.target.closest('.exercise-card') || e.target.closest('.group-exercises')) return;
     });
 
     // Settings gear
@@ -1645,7 +1642,8 @@
     document.getElementById('clear-all-btn').addEventListener('click', () => {
       if (confirm('Delete ALL workout data? This cannot be undone.')) {
         data = { logs: {}, targets: {}, customExercises: {}, exerciseOverrides: {}, hiddenExercises: {}, personalRecords: {} };
-        activeGroup = null;
+        expandedGroups.clear();
+        expandedExercise = null;
         lastCelebratedMilestone = 0;
         saveData();
         closeModal();
@@ -1916,12 +1914,11 @@
   let tutorialOverlay = null;
 
   function startTutorial() {
-    // Start from overview — deselect any active group
-    if (activeGroup) {
-      activeGroup = null;
-      document.getElementById('summary').classList.remove('card-compact');
+    // Start from overview — collapse any expanded groups
+    if (expandedGroups.size > 0) {
+      expandedGroups.clear();
+      expandedExercise = null;
       renderSummary();
-      document.getElementById('exercises').innerHTML = '';
     }
     tutorialStep = 0;
     showTutorialStep();
@@ -1937,11 +1934,9 @@
 
     const step = TUTORIAL_STEPS[tutorialStep];
     // Action: open a group for exercise-related steps
-    if (step.action === 'openGroup' && !activeGroup) {
-      activeGroup = 'back';
-      document.getElementById('summary').classList.add('card-compact');
+    if (step.action === 'openGroup' && !expandedGroups.has('back')) {
+      expandedGroups.add('back');
       renderSummary();
-      renderExercises();
     }
 
     let targetEl = document.querySelector(step.target);
@@ -2071,12 +2066,11 @@
       tutorialOverlay = null;
     }
     tutorialStep = 0;
-    // Return to initial state — deselect group, show overview
-    if (activeGroup) {
-      activeGroup = null;
-      document.getElementById('summary').classList.remove('card-compact');
+    // Return to initial state — collapse all groups
+    if (expandedGroups.size > 0) {
+      expandedGroups.clear();
+      expandedExercise = null;
       renderSummary();
-      document.getElementById('exercises').innerHTML = '';
     }
   }
 })();

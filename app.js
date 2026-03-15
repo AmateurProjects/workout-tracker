@@ -714,7 +714,8 @@
           <span class="card-chevron${isExpanded ? ' open' : ''}">›</span>
           <div class="exercise-icon">${ex.icon}</div>
           <div class="exercise-info">
-            <div class="exercise-name">${sanitize(ex.name)}${prBadgeHtml}</div>
+            <div class="exercise-name">${sanitize(ex.name)}</div>
+            ${prBadgeHtml ? `<div class="exercise-pr">${prBadgeHtml}</div>` : ''}
             <div class="exercise-meta">${metaHtml}</div>
           </div>
           <div class="exercise-sets">${dotsHtml}</div>
@@ -1012,7 +1013,7 @@
         <div class="edit-emoji-row">
           <input type="text" id="edit-exercise-icon" value="${ex.icon}" maxlength="4"
             class="edit-emoji-input" />
-          <input type="text" id="edit-exercise-name" value="${sanitize(ex.name)}" maxlength="40" placeholder="Exercise name"
+          <input type="text" id="edit-exercise-name" value="${sanitize(ex.name)}" maxlength="24" placeholder="Exercise name"
             style="background:var(--bg);border:2px solid var(--surface2);border-radius:10px;padding:12px 14px;color:var(--text);font-size:1rem;outline:none;flex:1;box-sizing:border-box;" />
         </div>
         <button class="btn btn-primary" id="edit-exercise-save">Save</button>
@@ -1083,7 +1084,7 @@
     title.textContent = 'Add Exercise';
     body.innerHTML = `
       <div style="display:flex;flex-direction:column;gap:14px">
-        <input type="text" id="new-exercise-input" placeholder="Exercise name" maxlength="40"
+        <input type="text" id="new-exercise-input" placeholder="Exercise name" maxlength="24"
           style="background:var(--bg);border:2px solid var(--surface2);border-radius:10px;padding:12px 14px;color:var(--text);font-size:1rem;outline:none;width:100%;box-sizing:border-box;"
         />
         <button class="btn btn-primary" id="add-exercise-confirm">Add</button>
@@ -1829,14 +1830,6 @@
       position: 'below',
     },
     {
-      target: '.summary-row.focus-glow',
-      title: 'Focus Recommendations',
-      text: '🎯 and a glowing border highlight the groups that need your attention most.',
-      position: 'below',
-      fallback: true,
-      fallbackTarget: '.summary-row',
-    },
-    {
       target: '.summary-row',
       title: 'Select a Group',
       text: 'Tap a muscle group to see its exercises.',
@@ -1848,13 +1841,6 @@
       title: 'Adjust Your Goal',
       text: 'Use +/− to change the 14-day set target.',
       position: 'below',
-      fallback: true,
-    },
-    {
-      target: '.exercise-card',
-      title: 'Exercise Actions',
-      text: 'Tap any exercise to expand it. You\'ll see buttons for adding sets, heavy sets, undoing, and more options.',
-      position: 'above',
       fallback: true,
     },
     {

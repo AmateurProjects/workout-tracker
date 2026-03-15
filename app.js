@@ -516,10 +516,10 @@
     return builtIn.concat(custom).map(applyOverride);
   }
 
-  function addCustomExercise(groupKey, name) {
+  function addCustomExercise(groupKey, name, icon) {
     if (!data.customExercises[groupKey]) data.customExercises[groupKey] = [];
     const id = 'custom_' + groupKey + '_' + Date.now();
-    const ex = { id, name, icon: '🏋️', dots: 4 };
+    const ex = { id, name, icon: icon || '🏋️', dots: 4 };
     data.customExercises[groupKey].push(ex);
     EXERCISE_GROUP_MAP[id] = groupKey;
     saveData();
@@ -1088,9 +1088,14 @@
     title.textContent = 'Add Exercise';
     body.innerHTML = `
       <div style="display:flex;flex-direction:column;gap:14px">
-        <input type="text" id="new-exercise-input" placeholder="Exercise name" maxlength="24"
-          style="background:var(--bg);border:2px solid var(--surface2);border-radius:10px;padding:12px 14px;color:var(--text);font-size:1rem;outline:none;width:100%;box-sizing:border-box;"
-        />
+        <div style="display:flex;gap:10px;align-items:center">
+          <input type="text" id="new-exercise-emoji" placeholder="🏋️"
+            style="background:var(--bg);border:2px solid var(--surface2);border-radius:10px;padding:12px 10px;color:var(--text);font-size:1.4rem;outline:none;width:52px;text-align:center;flex-shrink:0;box-sizing:border-box;"
+          />
+          <input type="text" id="new-exercise-input" placeholder="Exercise name" maxlength="24"
+            style="background:var(--bg);border:2px solid var(--surface2);border-radius:10px;padding:12px 14px;color:var(--text);font-size:1rem;outline:none;flex:1;min-width:0;box-sizing:border-box;"
+          />
+        </div>
         <button class="btn btn-primary" id="add-exercise-confirm">Add</button>
         ${restoreHtml}
       </div>
@@ -1099,13 +1104,19 @@
     modal.classList.remove('hidden');
 
     const input = document.getElementById('new-exercise-input');
+    const emojiInput = document.getElementById('new-exercise-emoji');
+    emojiInput.addEventListener('input', () => {
+      const match = emojiInput.value.match(/\p{Emoji_Presentation}(\u200d\p{Emoji_Presentation}|\ufe0f)*/u);
+      emojiInput.value = match ? match[0] : '';
+    });
     window.scrollTo({ top: 0, behavior: 'smooth' });
     input.focus();
 
     const confirm = () => {
       const name = input.value.trim();
       if (!name) return;
-      addCustomExercise(groupKey, name);
+      const emoji = document.getElementById('new-exercise-emoji').value.trim();
+      addCustomExercise(groupKey, name, emoji || undefined);
       closeModal();
       renderAll();
     };
@@ -1568,20 +1579,14 @@
       stepper.style.opacity = '0';
     }
 
-    // Lock wrapper height, then collapse smoothly overlapping with card fades
+    // Lock wrapper height, then start collapsing immediately (no delay)
     const wrapperH = wrapper.offsetHeight;
     wrapper.style.height = wrapperH + 'px';
     wrapper.style.overflow = 'hidden';
+    void wrapper.offsetHeight;
 
-    const collapseDelay = Math.min(last * stagger * 0.45, 150);
-
-    // Double rAF ensures the browser has painted the locked height before transitioning
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        wrapper.style.transition = `height 0.25s ease-in ${collapseDelay}ms`;
-        wrapper.style.height = '0';
-      });
-    });
+    wrapper.style.transition = `height ${(cardAnimTime / 1000).toFixed(2)}s cubic-bezier(0.4, 0, 1, 1)`;
+    wrapper.style.height = '0';
 
     // Clean up DOM after wrapper reaches 0
     setTimeout(() => {

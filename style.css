@@ -5,6 +5,17 @@
   padding: 0;
 }
 
+#app {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+#app input, #app textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 :root {
   --bg: #0f0f1a;
   --surface: #1a1a2e;
@@ -362,8 +373,6 @@ body {
   display: flex;
   flex-direction: column;
   cursor: pointer;
-  -webkit-user-select: none;
-  user-select: none;
   position: relative;
   overflow: hidden;
 }
@@ -819,6 +828,7 @@ body {
 
 .card-chevron.open {
   transform: rotate(270deg);
+  color: var(--group-color, var(--accent));
 }
 
 .card-actions {

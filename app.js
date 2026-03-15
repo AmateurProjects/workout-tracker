@@ -1498,53 +1498,53 @@
       return;
     }
 
-    // Stagger card opacity out (bottom to top) — opacity is GPU-composited, no layout cost
+    // Mirror the expand: stagger each card collapsing (height + opacity), bottom to top
     const cards = Array.from(exContainer.querySelectorAll('.exercise-card'));
     const last = cards.length - 1;
-    const cardFadeTime = last * 50 + 180;
 
+    // Snapshot all heights in one read pass (no interleaved reads/writes)
+    const heights = cards.map(card => card.offsetHeight);
+
+    // Lock all cards to their current height in one write pass
     cards.forEach((card, i) => {
-      const delay = (last - i) * 50;
-      card.style.transition = `opacity 0.18s ease ${delay}ms`;
-      card.style.opacity = '0';
+      card.style.height = heights[i] + 'px';
+      card.style.overflow = 'hidden';
+      card.style.minHeight = '0';
     });
 
-    // After cards have faded, collapse the whole container + stepper as one smooth height animation
-    setTimeout(() => {
-      // Lock current height, then animate to 0
-      const exHeight = exContainer.offsetHeight;
-      exContainer.style.height = exHeight + 'px';
-      exContainer.style.overflow = 'hidden';
-      void exContainer.offsetHeight; // force layout once
+    // Collapse container gap so it shrinks with cards
+    exContainer.style.transition = 'none';
 
-      let stepperHeight = 0;
-      if (stepperRow) {
-        stepperHeight = stepperRow.offsetHeight;
-        stepperRow.style.height = stepperHeight + 'px';
-        stepperRow.style.overflow = 'hidden';
-        void stepperRow.offsetHeight;
-      }
-
-      // Use will-change + transform-friendly properties via CSS transitions
-      requestAnimationFrame(() => {
-        exContainer.style.transition = 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease';
-        exContainer.style.height = '0';
-
-        if (stepperRow) {
-          stepperRow.style.transition = 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease';
-          stepperRow.style.height = '0';
-          stepperRow.style.opacity = '0';
-        }
+    // Stagger collapse bottom-to-top — matching expand's 60ms stagger + 0.3s duration
+    requestAnimationFrame(() => {
+      cards.forEach((card, i) => {
+        const delay = (last - i) * 60;
+        card.style.transition = `height 0.3s cubic-bezier(0.4, 0, 0.2, 1) ${delay}ms, opacity 0.25s ease ${delay}ms`;
+        card.style.height = '0';
+        card.style.opacity = '0';
       });
-    }, cardFadeTime);
+    });
 
-    // Clean up DOM after the height transition finishes
-    const cleanupTime = cardFadeTime + 320;
+    const cardAnimTime = last * 60 + 320;
+
+    // Collapse stepper alongside the last few cards
+    if (stepperRow) {
+      const stepperH = stepperRow.offsetHeight;
+      stepperRow.style.height = stepperH + 'px';
+      stepperRow.style.overflow = 'hidden';
+      requestAnimationFrame(() => {
+        stepperRow.style.transition = `height 0.3s cubic-bezier(0.4, 0, 0.2, 1) ${Math.max(0, cardAnimTime - 250)}ms, opacity 0.25s ease ${Math.max(0, cardAnimTime - 250)}ms`;
+        stepperRow.style.height = '0';
+        stepperRow.style.opacity = '0';
+      });
+    }
+
+    // Clean up DOM after everything finishes
     setTimeout(() => {
       if (exContainer.parentElement) exContainer.remove();
       if (stepperRow && stepperRow.parentElement) stepperRow.remove();
       animatingGroups.delete(groupKey);
-    }, cleanupTime);
+    }, cardAnimTime + 100);
   }
 
   // ===== Init =====

@@ -202,10 +202,10 @@ body {
 }
 
 .summary-chevron {
-  font-size: 0.85rem;
+  font-size: 1.3rem;
   color: var(--text-dim);
   flex-shrink: 0;
-  width: 16px;
+  width: 20px;
   text-align: center;
   transition: color 0.15s;
 }
@@ -324,7 +324,7 @@ body {
   padding: 0;
   min-height: 64px;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   cursor: pointer;
   -webkit-user-select: none;
   user-select: none;
@@ -764,10 +764,10 @@ body {
 
 /* ===== Card Chevron & Expandable Actions ===== */
 .card-chevron {
-  font-size: 0.85rem;
+  font-size: 1.3rem;
   color: var(--text-dim);
   flex-shrink: 0;
-  width: 16px;
+  width: 20px;
   text-align: center;
   transition: color 0.15s;
 }

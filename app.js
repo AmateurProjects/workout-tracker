@@ -621,13 +621,13 @@
       const isActive = key === activeGroup;
       const chevron = isActive ? '▴' : '▾';
       row.innerHTML = `
+        <span class="summary-chevron">${chevron}</span>
         <span class="summary-label">${labelText}</span>
         <div class="summary-bar-track">
           <div class="summary-bar-fill" style="width:${fillPct}%;background:${color}"></div>
           ${pushVol > 0 ? `<div class="summary-bar-push" style="width:${pushPct}%"></div>` : ''}
           <span class="summary-bar-value">${vol} / ${target}</span>
         </div>
-        <span class="summary-chevron">${chevron}</span>
       `;
       row.addEventListener('click', (e) => {
         if (e.target.closest('.target-btn')) return;
@@ -711,13 +711,13 @@
 
       card.innerHTML = `
         <div class="card-inner">
+          <span class="card-chevron">${chevron}</span>
           <div class="exercise-icon">${ex.icon}</div>
           <div class="exercise-info">
             <div class="exercise-name">${sanitize(ex.name)}${prBadgeHtml}</div>
             <div class="exercise-meta">${metaHtml}</div>
           </div>
           <div class="exercise-sets">${dotsHtml}</div>
-          <span class="card-chevron">${chevron}</span>
         </div>
         ${isExpanded ? `<div class="card-actions">
           <button class="card-action-item card-action-add" data-exercise="${ex.id}">＋ Set</button>

@@ -227,14 +227,76 @@
   let celebrationPlaying = false;
   const _sanitizeEl = document.createElement('div');
 
+  // Celebration praise phrases — non-repeating random, inspired by games/movies/songs/fitness
+  const CELEBRATION_PHRASES = [
+    { label: 'Warming Up', emoji: '🔥' },
+    { label: 'Getting Strong', emoji: '💪' },
+    { label: 'On Fire', emoji: '🔥🔥' },
+    { label: 'Beast Mode', emoji: '⚡' },
+    { label: 'Unstoppable', emoji: '🚀' },
+    { label: 'Legend', emoji: '🏆' },
+    { label: 'Level Up', emoji: '🆙' },
+    { label: 'Combo Breaker', emoji: '💥' },
+    { label: 'Power Surge', emoji: '⚡' },
+    { label: 'Final Form', emoji: '🔥' },
+    { label: 'No Mercy', emoji: '💀' },
+    { label: 'GG EZ', emoji: '🎮' },
+    { label: 'Critical Hit', emoji: '🎯' },
+    { label: 'Boss Fight Won', emoji: '👾' },
+    { label: 'Flawless Victory', emoji: '🥊' },
+    { label: 'Finish Him', emoji: '💪' },
+    { label: 'Gains Unlocked', emoji: '🔓' },
+    { label: 'New High Score', emoji: '🏅' },
+    { label: 'Stronger Every Rep', emoji: '🏋️' },
+    { label: 'Sweat Equity', emoji: '💧' },
+    { label: 'Iron Will', emoji: '🦾' },
+    { label: 'No Days Off', emoji: '📅' },
+    { label: 'All Gas No Brakes', emoji: '⛽' },
+    { label: 'Harder Better Faster', emoji: '🤖' },
+    { label: 'Eye of the Tiger', emoji: '🐯' },
+    { label: 'Can\'t Stop Won\'t Stop', emoji: '🔁' },
+    { label: 'Pump It Up', emoji: '🎶' },
+    { label: 'Raise the Bar', emoji: '📈' },
+    { label: 'Built Different', emoji: '🧬' },
+    { label: 'Zero to Hero', emoji: '⭐' },
+    { label: 'Ultra Instinct', emoji: '👁️' },
+    { label: 'Rep City', emoji: '🏙️' },
+    { label: 'Knocked It Out', emoji: '🥊' },
+    { label: 'Victory Lap', emoji: '🏁' },
+    { label: 'Max Power', emoji: '💥' },
+    { label: 'Legendary Status', emoji: '👑' },
+    { label: 'Turbo Mode', emoji: '🏎️' },
+    { label: 'Stay Hungry', emoji: '🐺' },
+    { label: 'One More Rep', emoji: '☝️' },
+    { label: 'No Limits', emoji: '♾️' },
+    { label: 'Bring the Thunder', emoji: '⛈️' },
+    { label: 'Pure Grind', emoji: '⚙️' },
+    { label: 'Go Plus Ultra', emoji: '💫' },
+    { label: 'Swole Patrol', emoji: '🚨' },
+    { label: 'Titan Mode', emoji: '🗿' },
+    { label: 'Feel the Burn', emoji: '🔥' },
+    { label: 'World Record', emoji: '🕹️' },
+    { label: 'Double XP', emoji: '✨' },
+    { label: 'Iron Sharpens Iron', emoji: '⚔️' },
+  ];
+  let usedPhraseIndices = [];
+
+  function getRandomPhrase() {
+    if (usedPhraseIndices.length >= CELEBRATION_PHRASES.length) usedPhraseIndices = [];
+    const available = CELEBRATION_PHRASES.map((_, i) => i).filter(i => !usedPhraseIndices.includes(i));
+    const pick = available[Math.floor(Math.random() * available.length)];
+    usedPhraseIndices.push(pick);
+    return CELEBRATION_PHRASES[pick];
+  }
+
   // Milestone tiers for non-cardio daily sets
   const MILESTONES = [
-    { sets: 3,  label: 'Warming Up', emoji: '🔥', particles: 14,  duration: 2500, vibrate: [50] },
-    { sets: 6,  label: 'Getting Strong', emoji: '💪', particles: 24, duration: 3300, vibrate: [50, 30, 50] },
-    { sets: 9,  label: 'On Fire', emoji: '🔥🔥', particles: 36, duration: 4000, vibrate: [50, 30, 80] },
-    { sets: 12, label: 'Beast Mode', emoji: '⚡', particles: 50, duration: 4600, vibrate: [60, 40, 60, 40, 100] },
-    { sets: 15, label: 'Unstoppable', emoji: '🚀', particles: 70, duration: 5200, vibrate: [80, 50, 80, 50, 150] },
-    { sets: 18, label: 'Legend', emoji: '🏆', particles: 95, duration: 5800, vibrate: [100, 60, 100, 60, 200] },
+    { sets: 3,  particles: 14,  duration: 2500, vibrate: [50] },
+    { sets: 6,  particles: 24, duration: 3300, vibrate: [50, 30, 50] },
+    { sets: 9,  particles: 36, duration: 4000, vibrate: [50, 30, 80] },
+    { sets: 12, particles: 50, duration: 4600, vibrate: [60, 40, 60, 40, 100] },
+    { sets: 15, particles: 70, duration: 5200, vibrate: [80, 50, 80, 50, 150] },
+    { sets: 18, particles: 95, duration: 5800, vibrate: [100, 60, 100, 60, 200] },
   ];
 
   // ===== Persistence (localStorage) =====
@@ -795,9 +857,9 @@
           <div class="exercise-sets">${dotsHtml}</div>
         </div>
         ${isExerciseExpanded ? `<div class="card-actions${skipActionAnim ? ' no-animate' : ''}">
-          <button class="card-action-item card-action-add" data-exercise="${ex.id}">＋ Set</button>
-          <button class="card-action-item card-action-heavy" data-exercise="${ex.id}">🔥 Heavy</button>
-          <button class="card-action-item card-action-remove" data-exercise="${ex.id}">− Undo</button>
+          <button class="card-action-item card-action-add" data-exercise="${ex.id}">+ Set</button>
+          <button class="card-action-item card-action-heavy" data-exercise="${ex.id}">🔥 Set</button>
+          <button class="card-action-item card-action-remove" data-exercise="${ex.id}">- Set</button>
           <button class="card-action-item card-action-options" data-exercise="${ex.id}">✏️ More</button>
         </div>` : ''}
       `;
@@ -1183,6 +1245,8 @@
 
   // ===== Celebrations (milestones, group goals, cardio) =====
 
+  let activeCelebrationCleanup = null;
+
   function queueCelebration(playFn) {
     celebrationQueue.push(playFn);
     if (!celebrationPlaying) drainCelebrationQueue();
@@ -1193,6 +1257,22 @@
     celebrationPlaying = true;
     const playFn = celebrationQueue.shift();
     playFn(() => drainCelebrationQueue());
+  }
+
+  function dismissCelebration(overlay, done) {
+    if (overlay._dismissed) return;
+    overlay._dismissed = true;
+    if (overlay._timeout) clearTimeout(overlay._timeout);
+    overlay.classList.add('celebrate-fade');
+    document.getElementById('app').classList.remove('screen-shake');
+    activeCelebrationCleanup = null;
+    setTimeout(() => { overlay.remove(); done(); }, 500);
+  }
+
+  function scheduleCelebrationEnd(overlay, done, delay) {
+    overlay._timeout = setTimeout(() => dismissCelebration(overlay, done), delay);
+    overlay.addEventListener('click', () => dismissCelebration(overlay, done));
+    activeCelebrationCleanup = () => dismissCelebration(overlay, done);
   }
 
   function celebrateGroupGoal(groupKey) {
@@ -1227,8 +1307,8 @@
       const dist = 140 + Math.random() * 300;
       p.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
       p.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
-      p.style.animationDelay = Math.random() * 0.4 + 's';
-      p.style.animationDuration = (0.9 + Math.random() * 0.7) + 's';
+      p.style.animationDelay = Math.random() * 0.8 + 's';
+      p.style.animationDuration = (1.8 + Math.random() * 1.5) + 's';
       p.style.fontSize = (20 + Math.random() * 22) + 'px';
       overlay.appendChild(p);
     }
@@ -1241,8 +1321,8 @@
       p.textContent = shapes[Math.floor(Math.random() * shapes.length)];
       p.style.color = color;
       p.style.left = Math.random() * 100 + '%';
-      p.style.animationDelay = Math.random() * 0.8 + 's';
-      p.style.animationDuration = (1.8 + Math.random() * 1.8) + 's';
+      p.style.animationDelay = Math.random() * 1.2 + 's';
+      p.style.animationDuration = (2.5 + Math.random() * 2.5) + 's';
       p.style.fontSize = (14 + Math.random() * 20) + 'px';
       overlay.appendChild(p);
     }
@@ -1253,10 +1333,7 @@
 
     document.getElementById('app').appendChild(overlay);
 
-    setTimeout(() => {
-      overlay.classList.add('celebrate-fade');
-      setTimeout(() => { overlay.remove(); done(); }, 500);
-    }, 6000);
+    scheduleCelebrationEnd(overlay, done, 6000);
     });
   }
 
@@ -1281,17 +1358,14 @@
       p.textContent = emojis[Math.floor(Math.random() * emojis.length)];
       const yOffset = (Math.random() - 0.5) * 280;
       p.style.setProperty('--y-offset', yOffset + 'px');
-      p.style.animationDelay = (i * 0.05) + 's';
+      p.style.animationDelay = (i * 0.09) + 's';
       p.style.fontSize = (18 + Math.random() * 16) + 'px';
       overlay.appendChild(p);
     }
 
     document.getElementById('app').appendChild(overlay);
 
-    setTimeout(() => {
-      overlay.classList.add('celebrate-fade');
-      setTimeout(() => { overlay.remove(); done(); }, 500);
-    }, 4000);
+    scheduleCelebrationEnd(overlay, done, 4000);
     });
   }
 
@@ -1314,38 +1388,31 @@
     btn.classList.add('btn-pop');
   }
 
-  function floatToBar(btn, groupKey, isHeavy) {
-    const container = document.getElementById('summary-bars');
-    const barRow = container.querySelector(`.summary-row[data-group="${groupKey}"]`);
-    if (!barRow) return;
-    const barTrack = barRow.querySelector('.summary-bar-track');
-    if (!barTrack) return;
-
+  function floatSymbol(btn, targetEl, text, color) {
+    if (!targetEl) return;
     const btnRect = btn.getBoundingClientRect();
-    const barRect = barTrack.getBoundingClientRect();
-    const color = GROUP_COLORS[groupKey] || '#6c63ff';
+    const targetRect = targetEl.getBoundingClientRect();
 
-    // Randomize the arc
     const startX = btnRect.left + btnRect.width / 2;
     const startY = btnRect.top + btnRect.height / 2;
-    const endX = barRect.left + barRect.width * (0.55 + Math.random() * 0.3);
-    const endY = barRect.top + barRect.height / 2;
+    const endX = targetRect.left + targetRect.width * (0.55 + Math.random() * 0.3);
+    const endY = targetRect.top + targetRect.height / 2;
     const drift = (Math.random() - 0.5) * 40;
     const duration = 400 + Math.random() * 150;
     const startScale = 0.9 + Math.random() * 0.3;
 
     const dot = document.createElement('div');
-    dot.textContent = isHeavy ? '🔥' : '+1';
+    dot.textContent = text;
     dot.style.cssText = `
       position: fixed;
       left: 0;
       top: 0;
-      font-size: ${isHeavy ? '2rem' : '1.5rem'};
+      font-size: 2.2rem;
       font-weight: 700;
-      color: ${isHeavy ? '#ff9f43' : color};
+      color: ${color};
       pointer-events: none;
       z-index: 9999;
-      text-shadow: 0 0 8px ${isHeavy ? 'rgba(255,159,67,0.6)' : color + '80'};
+      text-shadow: 0 0 10px ${color}80;
       will-change: transform, opacity;
     `;
     document.body.appendChild(dot);
@@ -1353,7 +1420,6 @@
     const startTime = performance.now();
     function animate(now) {
       const t = Math.min((now - startTime) / duration, 1);
-      // Ease-out cubic
       const ease = 1 - Math.pow(1 - t, 3);
       const x = startX + (endX - startX) * ease + drift * Math.sin(t * Math.PI);
       const y = startY + (endY - startY) * ease - 30 * Math.sin(t * Math.PI);
@@ -1370,51 +1436,20 @@
     requestAnimationFrame(animate);
   }
 
+  function floatToBar(btn, groupKey, isHeavy) {
+    const container = document.getElementById('summary-bars');
+    const barRow = container.querySelector(`.summary-row[data-group="${groupKey}"]`);
+    if (!barRow) return;
+    const barTrack = barRow.querySelector('.summary-bar-track');
+    if (!barTrack) return;
+    const color = GROUP_COLORS[groupKey] || '#6c63ff';
+    floatSymbol(btn, barTrack, isHeavy ? '🔥' : '+1', isHeavy ? '#ff9f43' : color);
+  }
+
   function floatToStreak(btn, isHeavy) {
     const badge = document.getElementById('streak-badge');
     if (!badge || badge.classList.contains('hidden')) return;
-
-    const btnRect = btn.getBoundingClientRect();
-    const badgeRect = badge.getBoundingClientRect();
-
-    const startX = btnRect.left + btnRect.width / 2;
-    const startY = btnRect.top + btnRect.height / 2;
-    const endX = badgeRect.left + badgeRect.width / 2 + (Math.random() - 0.5) * 10;
-    const endY = badgeRect.top + badgeRect.height / 2;
-    const drift = (Math.random() - 0.5) * 30;
-    const duration = 420 + Math.random() * 130;
-    const startScale = 0.8 + Math.random() * 0.3;
-
-    const dot = document.createElement('div');
-    dot.textContent = isHeavy ? '🔥' : '⚡';
-    dot.style.cssText = `
-      position: fixed;
-      left: 0;
-      top: 0;
-      font-size: 1.5rem;
-      pointer-events: none;
-      z-index: 9999;
-      will-change: transform, opacity;
-    `;
-    document.body.appendChild(dot);
-
-    const startTime = performance.now();
-    function animate(now) {
-      const t = Math.min((now - startTime) / duration, 1);
-      const ease = 1 - Math.pow(1 - t, 3);
-      const x = startX + (endX - startX) * ease + drift * Math.sin(t * Math.PI);
-      const y = startY + (endY - startY) * ease - 20 * Math.sin(t * Math.PI);
-      const scale = startScale + (0.3 - startScale) * ease;
-      const opacity = 1 - t * 0.6;
-      dot.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%) scale(${scale.toFixed(2)})`;
-      dot.style.opacity = opacity.toFixed(2);
-      if (t < 1) {
-        requestAnimationFrame(animate);
-      } else {
-        dot.remove();
-      }
-    }
-    requestAnimationFrame(animate);
+    floatSymbol(btn, badge, isHeavy ? '🔥' : '⚡', isHeavy ? '#ff9f43' : '#fbbf24');
   }
 
   function flashDots(card, exerciseId) {
@@ -1455,6 +1490,7 @@
     haptic(ms.vibrate);
 
     const tierIndex = MILESTONES.indexOf(ms);
+    const phrase = getRandomPhrase();
     const overlay = document.createElement('div');
     overlay.className = 'celebrate-overlay';
 
@@ -1463,7 +1499,7 @@
     banner.className = 'celebrate-banner';
     if (tierIndex >= 4) banner.classList.add('banner-glow');
     if (tierIndex >= 5) banner.classList.add('banner-gold');
-    banner.textContent = `${ms.label} ${ms.emoji}`;
+    banner.textContent = `${phrase.label} ${phrase.emoji}`;
     overlay.appendChild(banner);
 
     // Particles — scale up with tier
@@ -1480,7 +1516,7 @@
         const rise = 120 + Math.random() * 200;
         p.style.setProperty('--sx', spread + 'px');
         p.style.setProperty('--sy', -rise + 'px');
-        p.style.animationDelay = Math.random() * 0.3 + 's';
+        p.style.animationDelay = Math.random() * 0.6 + 's';
         p.style.fontSize = (16 + Math.random() * 14) + 'px';
         overlay.appendChild(p);
       }
@@ -1494,8 +1530,8 @@
         const dist = 120 + Math.random() * 260;
         p.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
         p.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
-        p.style.animationDelay = Math.random() * 0.4 + 's';
-        p.style.animationDuration = (0.8 + Math.random() * 0.7) + 's';
+        p.style.animationDelay = Math.random() * 0.8 + 's';
+        p.style.animationDuration = (1.8 + Math.random() * 1.5) + 's';
         p.style.fontSize = (18 + Math.random() * 18) + 'px';
         overlay.appendChild(p);
       }
@@ -1515,8 +1551,8 @@
         p.textContent = shapes[Math.floor(Math.random() * shapes.length)];
         p.style.color = colors[Math.floor(Math.random() * colors.length)];
         p.style.left = Math.random() * 100 + '%';
-        p.style.animationDelay = Math.random() * 0.7 + 's';
-        p.style.animationDuration = (1.8 + Math.random() * 1.8) + 's';
+        p.style.animationDelay = Math.random() * 1.2 + 's';
+        p.style.animationDuration = (2.5 + Math.random() * 2.5) + 's';
         p.style.fontSize = (14 + Math.random() * 22) + 'px';
         overlay.appendChild(p);
       }
@@ -1528,8 +1564,8 @@
         const dist = 160 + Math.random() * 280;
         p.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
         p.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
-        p.style.animationDelay = Math.random() * 0.4 + 's';
-        p.style.animationDuration = (0.9 + Math.random() * 0.7) + 's';
+        p.style.animationDelay = Math.random() * 0.8 + 's';
+        p.style.animationDuration = (1.8 + Math.random() * 1.5) + 's';
         p.style.fontSize = (20 + Math.random() * 20) + 'px';
         overlay.appendChild(p);
       }
@@ -1540,10 +1576,7 @@
 
     document.getElementById('app').appendChild(overlay);
 
-    setTimeout(() => {
-      overlay.classList.add('celebrate-fade');
-      setTimeout(() => { overlay.remove(); done(); }, 500);
-    }, ms.duration);
+    scheduleCelebrationEnd(overlay, done, ms.duration);
     });
   }
 

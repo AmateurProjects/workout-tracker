@@ -125,8 +125,21 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-dim);
-  margin-bottom: 14px;
+  margin-bottom: 0;
   transition: opacity 0.25s ease, height 0.25s ease, margin 0.25s ease, font-size 0.25s ease;
+}
+
+.summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.summary-legend {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  opacity: 0.7;
 }
 
 /* ===== Summary Bars ===== */
@@ -202,10 +215,10 @@ body {
 }
 
 .summary-chevron {
-  font-size: 1.3rem;
+  font-size: 1.6rem;
   color: var(--text-dim);
   flex-shrink: 0;
-  width: 20px;
+  width: 22px;
   text-align: center;
   transition: color 0.15s;
 }
@@ -764,10 +777,10 @@ body {
 
 /* ===== Card Chevron & Expandable Actions ===== */
 .card-chevron {
-  font-size: 1.3rem;
+  font-size: 1.6rem;
   color: var(--text-dim);
   flex-shrink: 0;
-  width: 20px;
+  width: 22px;
   text-align: center;
   transition: color 0.15s;
 }

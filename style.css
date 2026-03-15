@@ -376,6 +376,14 @@ body {
   transform: scale(0.97);
 }
 
+.exercise-card {
+  transition: opacity 0.25s ease;
+}
+
+.has-expanded-exercise .exercise-card:not(.expanded) {
+  opacity: 0.35;
+}
+
 .exercise-card-add {
   border: 2px dashed var(--surface2);
   background: transparent;

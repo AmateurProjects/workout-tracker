@@ -295,8 +295,8 @@
   function freshnessClass(n) {
     if (n === 0) return 'freshness-today';
     if (n === 1) return 'freshness-yesterday';
-    if (n <= 12) return 'freshness-recent';
-    if (n <= 14) return 'freshness-expiring';
+    if (n <= 11) return 'freshness-recent';
+    if (n <= 13) return 'freshness-expiring';
     return 'freshness-stale';
   }
 
@@ -327,7 +327,7 @@
     const today = todayStr();
     let total = 0;
     let pushed = 0;
-    // Freshness buckets: today(0), yesterday(1), recent(2-12), expiring(13-14)
+    // Freshness buckets: today(0), yesterday(1), recent(2-11), expiring(12-13)
     const buckets = { today: 0, yesterday: 0, recent: 0, expiring: 0 };
     for (const ex of exercises) {
       const logs = data.logs[ex.id] || [];
@@ -338,7 +338,7 @@
           if (l.push) pushed++;
           if (ago === 0) buckets.today++;
           else if (ago === 1) buckets.yesterday++;
-          else if (ago <= 12) buckets.recent++;
+          else if (ago <= 11) buckets.recent++;
           else buckets.expiring++;
         }
       }
@@ -654,7 +654,7 @@
     stepperRow.className = 'target-stepper-row';
     stepperRow.dataset.group = groupKey;
     stepperRow.innerHTML = `
-      <span class="target-label">14-Day Goal</span>
+      <span class="target-label">14-DAY SETS GOAL</span>
       <button class="target-btn" data-dir="-1" aria-label="Decrease target">&minus;</button>
       <span class="target-value">${target}</span>
       <button class="target-btn" data-dir="1" aria-label="Increase target">&plus;</button>
@@ -685,6 +685,7 @@
 
       const card = document.createElement('div');
       card.className = `exercise-card group-${groupKey}`;
+      if (expandedExercise === ex.id) card.classList.add('expanded');
       const withinWindow = lastDate && ago < VOLUME_WINDOW_DAYS;
       if (withinWindow) card.classList.add(freshnessClass(ago));
 
@@ -816,6 +817,7 @@
 
     // "Add Exercise" card
     const addCard = document.createElement('div');
+    if (expandedExercise) exContainer.classList.add('has-expanded-exercise');
     addCard.className = `exercise-card exercise-card-add group-${groupKey}`;
     addCard.innerHTML = `
       <div class="exercise-icon">➕</div>

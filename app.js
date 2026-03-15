@@ -1440,26 +1440,28 @@
     const rows = container.querySelectorAll('.summary-row');
 
     if (activeGroup === groupKey) {
-      // Toggle off — collapse exercises, then expand all rows back in
-      collapseExercises();
-      activeGroup = null;
-      card.classList.remove('card-compact');
-      renderSummary();
-      // Animate new rows in with stagger
-      const newRows = container.querySelectorAll('.summary-row');
-      newRows.forEach((row, i) => {
-        row.style.opacity = '0';
-        row.style.maxHeight = '0';
-        row.style.padding = '0 10px';
-        row.style.transition = 'none';
-        requestAnimationFrame(() => {
-          row.style.transition = 'opacity 0.3s ease, max-height 0.35s ease, padding 0.35s ease';
-          row.style.transitionDelay = (i * 40) + 'ms';
-          row.style.opacity = '1';
-          row.style.maxHeight = '60px';
-          row.style.padding = '10px 10px';
+      // Toggle off — collapse exercises first, then expand summary rows after
+      const collapseTime = collapseExercises();
+      setTimeout(() => {
+        activeGroup = null;
+        card.classList.remove('card-compact');
+        renderSummary();
+        // Animate new rows in with stagger
+        const newRows = container.querySelectorAll('.summary-row');
+        newRows.forEach((row, i) => {
+          row.style.opacity = '0';
+          row.style.maxHeight = '0';
+          row.style.padding = '0 10px';
+          row.style.transition = 'none';
+          requestAnimationFrame(() => {
+            row.style.transition = 'opacity 0.3s ease, max-height 0.35s ease, padding 0.35s ease';
+            row.style.transitionDelay = (i * 40) + 'ms';
+            row.style.opacity = '1';
+            row.style.maxHeight = '60px';
+            row.style.padding = '10px 10px';
+          });
         });
-      });
+      }, collapseTime);
       return;
     }
 

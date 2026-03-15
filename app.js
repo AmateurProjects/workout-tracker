@@ -731,16 +731,38 @@
       // Tap on card header to toggle expand/collapse
       card.querySelector('.card-inner').addEventListener('click', () => {
         if (expandedExercise === ex.id) {
-          // Collapsing — animate buttons out first
+          // Collapsing — animate buttons out right-to-left, then fold row up
           const actions = card.querySelector('.card-actions');
           if (actions) {
-            actions.classList.add('collapsing');
+            const btns = Array.from(actions.querySelectorAll('.card-action-item'));
+            // Cascade buttons out from right to left
+            btns.reverse().forEach((btn, i) => {
+              btn.style.transition = 'none';
+              btn.style.opacity = '1';
+              btn.style.transform = 'scale(1)';
+              btn.style.animation = 'none';
+              setTimeout(() => {
+                btn.style.transition = 'opacity 0.15s ease, transform 0.18s ease';
+                btn.style.opacity = '0';
+                btn.style.transform = 'translateY(-8px) scale(0.85)';
+              }, i * 45);
+            });
+            // After buttons disappear, fold the row up
+            const foldDelay = btns.length * 45 + 160;
+            setTimeout(() => {
+              actions.style.maxHeight = actions.scrollHeight + 'px';
+              actions.offsetHeight; // force layout
+              actions.classList.add('collapsing');
+              actions.style.maxHeight = '0';
+              actions.style.padding = '0 18px';
+              actions.style.opacity = '0';
+            }, foldDelay);
             setTimeout(() => {
               expandedExercise = null;
               skipAnimation = true;
               renderExercises();
               skipAnimation = false;
-            }, 280);
+            }, foldDelay + 200);
             return;
           }
           expandedExercise = null;
@@ -757,39 +779,47 @@
         card.querySelector('.card-action-add').addEventListener('click', (e) => {
           e.stopPropagation();
           popBtn(e.currentTarget);
-          skipActionAnim = true;
-          logExercise(ex.id);
-          skipActionAnim = false;
+          setTimeout(() => {
+            skipActionAnim = true;
+            logExercise(ex.id);
+            skipActionAnim = false;
+          }, 180);
         });
         card.querySelector('.card-action-heavy').addEventListener('click', (e) => {
           e.stopPropagation();
           popBtn(e.currentTarget);
-          skipActionAnim = true;
-          logExercise(ex.id);
-          // Immediately mark as push
-          const logs = data.logs[ex.id] || [];
-          const last = logs[logs.length - 1];
-          if (last && last.date === todayStr()) {
-            last.push = true;
-            saveData();
-          }
-          if (pushWindow) { clearTimeout(pushWindow.timer); pushWindow = null; }
-          skipAnimation = true;
-          renderExercises();
-          skipAnimation = false;
-          skipActionAnim = false;
+          setTimeout(() => {
+            skipActionAnim = true;
+            logExercise(ex.id);
+            // Immediately mark as push
+            const logs = data.logs[ex.id] || [];
+            const last = logs[logs.length - 1];
+            if (last && last.date === todayStr()) {
+              last.push = true;
+              saveData();
+            }
+            if (pushWindow) { clearTimeout(pushWindow.timer); pushWindow = null; }
+            skipAnimation = true;
+            renderExercises();
+            skipAnimation = false;
+            skipActionAnim = false;
+          }, 180);
         });
         card.querySelector('.card-action-remove').addEventListener('click', (e) => {
           e.stopPropagation();
           popBtn(e.currentTarget);
-          skipActionAnim = true;
-          removeLastTodaySet(ex.id);
-          skipActionAnim = false;
+          setTimeout(() => {
+            skipActionAnim = true;
+            removeLastTodaySet(ex.id);
+            skipActionAnim = false;
+          }, 180);
         });
         card.querySelector('.card-action-options').addEventListener('click', (e) => {
           e.stopPropagation();
           popBtn(e.currentTarget);
-          showExerciseOptions(ex.id, activeGroup);
+          setTimeout(() => {
+            showExerciseOptions(ex.id, activeGroup);
+          }, 180);
         });
       }
 
@@ -1194,6 +1224,7 @@
   }
 
   function popBtn(btn) {
+    btn.classList.add('anim-done');
     btn.classList.remove('btn-pop');
     void btn.offsetWidth;
     btn.classList.add('btn-pop');
@@ -1416,6 +1447,7 @@
 
     // Animate departing rows
     card.classList.add('card-compact');
+    const activeRow = container.querySelector(`.summary-row[data-group="${groupKey}"]`);
     outRows.forEach(row => {
       row.style.transition = 'opacity 0.25s ease, max-height 0.3s ease, padding 0.3s ease';
       row.style.opacity = '0';
@@ -1425,9 +1457,19 @@
 
     // After animation, render the selected state
     setTimeout(() => {
+      // Remove departed rows but keep the active one to prevent flash
+      outRows.forEach(row => row.remove());
       activeGroup = groupKey;
       renderExercises();
+      // Remove the old active row's transition so it doesn't flash during rebuild
+      if (activeRow) activeRow.style.transition = 'none';
       renderSummary();
+      // The rebuilt active row should also have no transition on first paint
+      const newActive = container.querySelector('.summary-row.active');
+      if (newActive) {
+        newActive.style.transition = 'none';
+        requestAnimationFrame(() => { newActive.style.transition = ''; });
+      }
     }, 280);
   }
 
@@ -1437,14 +1479,13 @@
     const last = cards.length - 1;
     cards.forEach((card, i) => {
       const delay = (last - i) * 55;
-      card.style.transition = 'none';
-      requestAnimationFrame(() => {
-        card.style.transition = `opacity 0.35s ease ${delay}ms, transform 0.45s cubic-bezier(0.55, 0, 0.78, 0) ${delay}ms`;
+      setTimeout(() => {
+        card.style.transition = 'opacity 0.3s ease, transform 0.35s cubic-bezier(0.55, 0, 0.78, 0)';
         card.style.opacity = '0';
-        card.style.transform = 'translateY(80px)';
-      });
+        card.style.transform = 'translateY(-60px)';
+      }, delay);
     });
-    setTimeout(() => { container.innerHTML = ''; }, (last * 55) + 450);
+    setTimeout(() => { container.innerHTML = ''; }, (last * 55) + 350);
   }
 
   // ===== Init =====

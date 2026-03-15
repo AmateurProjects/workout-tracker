@@ -619,9 +619,8 @@
       row.style.setProperty('--group-color', color);
 
       const isActive = key === activeGroup;
-      const chevron = isActive ? '▴' : '▾';
       row.innerHTML = `
-        <span class="summary-chevron">${chevron}</span>
+        <span class="summary-chevron${isActive ? ' open' : ''}">›</span>
         <span class="summary-label">${labelText}</span>
         <div class="summary-bar-track">
           <div class="summary-bar-fill" style="width:${fillPct}%;background:${color}"></div>
@@ -707,11 +706,10 @@
       const prBadgeHtml = pr ? `<span class="pr-badge">PR: ${sanitize(pr.value)}${pr.unit ? ' ' + sanitize(pr.unit) : ''}</span>` : '';
 
       const isExpanded = expandedExercise === ex.id;
-      const chevron = isExpanded ? '▴' : '▾';
 
       card.innerHTML = `
         <div class="card-inner">
-          <span class="card-chevron">${chevron}</span>
+          <span class="card-chevron${isExpanded ? ' open' : ''}">›</span>
           <div class="exercise-icon">${ex.icon}</div>
           <div class="exercise-info">
             <div class="exercise-name">${sanitize(ex.name)}${prBadgeHtml}</div>

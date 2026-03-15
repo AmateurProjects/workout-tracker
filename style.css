@@ -215,12 +215,19 @@ body {
 }
 
 .summary-chevron {
-  font-size: 1.6rem;
+  font-size: 1.4rem;
+  font-weight: 700;
   color: var(--text-dim);
   flex-shrink: 0;
-  width: 22px;
+  width: 18px;
   text-align: center;
-  transition: color 0.15s;
+  display: inline-block;
+  transform: rotate(90deg);
+  transition: transform 0.25s ease, color 0.15s;
+}
+
+.summary-chevron.open {
+  transform: rotate(270deg);
 }
 
 .summary-row.active .summary-chevron {
@@ -777,12 +784,19 @@ body {
 
 /* ===== Card Chevron & Expandable Actions ===== */
 .card-chevron {
-  font-size: 1.6rem;
+  font-size: 1.4rem;
+  font-weight: 700;
   color: var(--text-dim);
   flex-shrink: 0;
-  width: 22px;
+  width: 18px;
   text-align: center;
-  transition: color 0.15s;
+  display: inline-block;
+  transform: rotate(90deg);
+  transition: transform 0.25s ease, color 0.15s;
+}
+
+.card-chevron.open {
+  transform: rotate(270deg);
 }
 
 .card-actions {

@@ -1498,45 +1498,53 @@
       return;
     }
 
-    // Animate cards out — bottom to top
+    // Stagger card opacity out (bottom to top) — opacity is GPU-composited, no layout cost
     const cards = Array.from(exContainer.querySelectorAll('.exercise-card'));
     const last = cards.length - 1;
-
-    cards.forEach(card => {
-      card.style.height = card.offsetHeight + 'px';
-      card.style.overflow = 'hidden';
-      card.style.minHeight = '0';
-    });
+    const cardFadeTime = last * 50 + 180;
 
     cards.forEach((card, i) => {
-      const delay = (last - i) * 60;
-      setTimeout(() => {
-        card.style.transition = 'height 0.28s ease-in, opacity 0.2s ease';
-        card.style.height = '0';
-        card.style.opacity = '0';
-      }, delay);
-      setTimeout(() => {
-        card.style.display = 'none';
-      }, delay + 280);
+      const delay = (last - i) * 50;
+      card.style.transition = `opacity 0.18s ease ${delay}ms`;
+      card.style.opacity = '0';
     });
 
-    const totalTime = last * 60 + 300;
+    // After cards have faded, collapse the whole container + stepper as one smooth height animation
+    setTimeout(() => {
+      // Lock current height, then animate to 0
+      const exHeight = exContainer.offsetHeight;
+      exContainer.style.height = exHeight + 'px';
+      exContainer.style.overflow = 'hidden';
+      void exContainer.offsetHeight; // force layout once
 
-    // Collapse stepper near the end
-    if (stepperRow) {
-      setTimeout(() => {
+      let stepperHeight = 0;
+      if (stepperRow) {
+        stepperHeight = stepperRow.offsetHeight;
+        stepperRow.style.height = stepperHeight + 'px';
         stepperRow.style.overflow = 'hidden';
-        stepperRow.style.transition = 'height 0.25s ease-in, opacity 0.2s ease';
-        stepperRow.style.height = '0';
-        stepperRow.style.opacity = '0';
-      }, Math.max(0, totalTime - 150));
-    }
+        void stepperRow.offsetHeight;
+      }
 
+      // Use will-change + transform-friendly properties via CSS transitions
+      requestAnimationFrame(() => {
+        exContainer.style.transition = 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease';
+        exContainer.style.height = '0';
+
+        if (stepperRow) {
+          stepperRow.style.transition = 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease';
+          stepperRow.style.height = '0';
+          stepperRow.style.opacity = '0';
+        }
+      });
+    }, cardFadeTime);
+
+    // Clean up DOM after the height transition finishes
+    const cleanupTime = cardFadeTime + 320;
     setTimeout(() => {
       if (exContainer.parentElement) exContainer.remove();
       if (stepperRow && stepperRow.parentElement) stepperRow.remove();
       animatingGroups.delete(groupKey);
-    }, totalTime + 200);
+    }, cleanupTime);
   }
 
   // ===== Init =====

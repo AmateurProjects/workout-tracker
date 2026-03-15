@@ -125,6 +125,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  will-change: height;
 }
 
 .card h2 {

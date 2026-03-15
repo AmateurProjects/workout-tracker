@@ -216,6 +216,7 @@
 
   let activeGroup = null;
   let expandedExercise = null; // track which exercise card is expanded
+  let skipActionAnim = false; // suppress action button animation on re-render
   let pushWindow = null; // { exerciseId, ts, timer }
   let lastCelebratedMilestone = 0; // track highest milestone celebrated this session
   let cardioCelebratedToday = false;
@@ -476,10 +477,11 @@
     if (!pushWindow) return;
     clearTimeout(pushWindow.timer);
     pushWindow = null;
-    // Re-render to revert action button from 🔥 back to −
     skipAnimation = true;
+    skipActionAnim = true;
     renderExercises();
     skipAnimation = false;
+    skipActionAnim = false;
   }
 
   function applyOverride(ex) {
@@ -717,7 +719,7 @@
           </div>
           <div class="exercise-sets">${dotsHtml}</div>
         </div>
-        ${isExpanded ? `<div class="card-actions">
+        ${isExpanded ? `<div class="card-actions${skipActionAnim ? ' no-animate' : ''}">
           <button class="card-action-item card-action-add" data-exercise="${ex.id}">＋ Set</button>
           <button class="card-action-item card-action-heavy" data-exercise="${ex.id}">🔥 Heavy</button>
           <button class="card-action-item card-action-remove" data-exercise="${ex.id}">− Undo</button>
@@ -737,10 +739,13 @@
       if (isExpanded) {
         card.querySelector('.card-action-add').addEventListener('click', (e) => {
           e.stopPropagation();
+          skipActionAnim = true;
           logExercise(ex.id);
+          skipActionAnim = false;
         });
         card.querySelector('.card-action-heavy').addEventListener('click', (e) => {
           e.stopPropagation();
+          skipActionAnim = true;
           logExercise(ex.id);
           // Immediately mark as push
           const logs = data.logs[ex.id] || [];
@@ -753,10 +758,13 @@
           skipAnimation = true;
           renderExercises();
           skipAnimation = false;
+          skipActionAnim = false;
         });
         card.querySelector('.card-action-remove').addEventListener('click', (e) => {
           e.stopPropagation();
+          skipActionAnim = true;
           removeLastTodaySet(ex.id);
+          skipActionAnim = false;
         });
         card.querySelector('.card-action-options').addEventListener('click', (e) => {
           e.stopPropagation();

@@ -838,6 +838,12 @@ body {
   transform: scale(0.93);
 }
 
+.card-actions.no-animate .card-action-item {
+  opacity: 1;
+  transform: none;
+  animation: none;
+}
+
 .card-action-add {
   border-color: #2ed573;
   color: #2ed573;

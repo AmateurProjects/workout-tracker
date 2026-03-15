@@ -779,28 +779,34 @@
         card.querySelector('.card-action-add').addEventListener('click', (e) => {
           e.stopPropagation();
           popBtn(e.currentTarget);
+          // Log immediately so dots update, delay full re-render for button pop
+          if (!data.logs[ex.id]) data.logs[ex.id] = [];
+          const entry = { date: todayStr(), ts: Date.now() };
+          data.logs[ex.id].push(entry);
+          saveData();
+          if (pushWindow) clearTimeout(pushWindow.timer);
+          pushWindow = { exerciseId: ex.id, ts: entry.ts, timer: setTimeout(clearPushWindow, 3000) };
+          flashDots(card, ex.id);
           setTimeout(() => {
             skipActionAnim = true;
-            logExercise(ex.id);
+            renderAll();
             skipActionAnim = false;
           }, 180);
         });
         card.querySelector('.card-action-heavy').addEventListener('click', (e) => {
           e.stopPropagation();
           popBtn(e.currentTarget);
+          // Log + mark push immediately
+          if (!data.logs[ex.id]) data.logs[ex.id] = [];
+          const entry = { date: todayStr(), ts: Date.now(), push: true };
+          data.logs[ex.id].push(entry);
+          saveData();
+          if (pushWindow) { clearTimeout(pushWindow.timer); pushWindow = null; }
+          flashDots(card, ex.id);
           setTimeout(() => {
             skipActionAnim = true;
-            logExercise(ex.id);
-            // Immediately mark as push
-            const logs = data.logs[ex.id] || [];
-            const last = logs[logs.length - 1];
-            if (last && last.date === todayStr()) {
-              last.push = true;
-              saveData();
-            }
-            if (pushWindow) { clearTimeout(pushWindow.timer); pushWindow = null; }
             skipAnimation = true;
-            renderExercises();
+            renderAll();
             skipAnimation = false;
             skipActionAnim = false;
           }, 180);
@@ -808,9 +814,16 @@
         card.querySelector('.card-action-remove').addEventListener('click', (e) => {
           e.stopPropagation();
           popBtn(e.currentTarget);
+          // Remove last today set immediately
+          const today = todayStr();
+          const logs = data.logs[ex.id] || [];
+          for (let ri = logs.length - 1; ri >= 0; ri--) {
+            if (logs[ri].date === today) { logs.splice(ri, 1); saveData(); break; }
+          }
+          flashDots(card, ex.id);
           setTimeout(() => {
             skipActionAnim = true;
-            removeLastTodaySet(ex.id);
+            renderAll();
             skipActionAnim = false;
           }, 180);
         });
@@ -1230,6 +1243,26 @@
     btn.classList.add('btn-pop');
   }
 
+  function flashDots(card, exerciseId) {
+    const dotsEl = card.querySelector('.exercise-sets');
+    if (!dotsEl) return;
+    const ex = findExercise(exerciseId);
+    if (!ex) return;
+    const todayLogs = getTodayLogs(exerciseId);
+    const todaySets = todayLogs.length;
+    const dotCount = ex.dots;
+    let html = '';
+    for (let i = 0; i < dotCount; i++) {
+      if (i < todaySets) {
+        const isPushed = todayLogs[i] && todayLogs[i].push;
+        html += `<span class="set-dot filled${isPushed ? ' pushed' : ''}"></span>`;
+      } else {
+        html += '<span class="set-dot"></span>';
+      }
+    }
+    dotsEl.innerHTML = html;
+  }
+
   function haptic(pattern) {
     if (navigator.vibrate) {
       navigator.vibrate(pattern);
@@ -1477,15 +1510,29 @@
     const container = document.getElementById('exercises');
     const cards = Array.from(container.querySelectorAll('.exercise-card'));
     const last = cards.length - 1;
+    // Switch from gap to margin so spacing can collapse per-card
+    container.style.gap = '0';
+    cards.forEach(card => {
+      card.style.height = card.offsetHeight + 'px';
+      card.style.minHeight = '0';
+      card.style.marginBottom = '10px';
+    });
+    // Cascade from bottom card to top — each folds up into nothing
     cards.forEach((card, i) => {
-      const delay = (last - i) * 55;
+      const delay = (last - i) * 60;
       setTimeout(() => {
-        card.style.transition = 'opacity 0.3s ease, transform 0.35s cubic-bezier(0.55, 0, 0.78, 0)';
+        card.style.transition = 'height 0.28s cubic-bezier(0.55, 0, 0.78, 0), opacity 0.2s ease, margin-bottom 0.28s ease';
+        card.style.height = '0';
         card.style.opacity = '0';
-        card.style.transform = 'translateY(-60px)';
+        card.style.marginBottom = '0';
       }, delay);
     });
-    setTimeout(() => { container.innerHTML = ''; }, (last * 55) + 350);
+    const totalTime = (last * 60) + 300;
+    setTimeout(() => {
+      container.innerHTML = '';
+      container.style.gap = '';
+    }, totalTime);
+    return totalTime;
   }
 
   // ===== Init =====

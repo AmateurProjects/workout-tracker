@@ -197,10 +197,6 @@ body {
   opacity: 0.15;
 }
 
-.summary-row:active {
-  background: var(--surface2);
-}
-
 .summary-row.active {
   background: color-mix(in srgb, var(--group-color, var(--accent)) 12%, transparent);
   border-color: var(--group-color, var(--accent));

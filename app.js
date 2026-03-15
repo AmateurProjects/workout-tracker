@@ -703,7 +703,24 @@
         const dir = parseInt(btn.dataset.dir, 10);
         const newTarget = Math.max(1, getTarget(groupKey) + dir);
         setTarget(groupKey, newTarget);
-        renderSummary();
+        // Update stepper value in-place
+        const valEl = stepperRow.querySelector('.target-value');
+        if (valEl) valEl.textContent = newTarget;
+        // Update the summary bar without rebuilding exercises
+        const container = document.getElementById('summary-bars');
+        const row = container.querySelector(`.summary-row[data-group="${groupKey}"]`);
+        if (row) {
+          const { total: vol, pushed: pushVol } = getGroupStats14Days(groupKey);
+          const color = GROUP_COLORS[groupKey] || '#6c63ff';
+          const fillPct = newTarget > 0 ? Math.min((vol / newTarget) * 100, 100) : 0;
+          const pushPct = newTarget > 0 ? Math.min((pushVol / newTarget) * 100, 100) : 0;
+          const fill = row.querySelector('.summary-bar-fill');
+          if (fill) { fill.style.width = fillPct + '%'; fill.style.background = color; }
+          const push = row.querySelector('.summary-bar-push');
+          if (push) push.style.width = pushPct + '%';
+          const valSpan = row.querySelector('.summary-bar-value');
+          if (valSpan) valSpan.textContent = `${vol} / ${newTarget}`;
+        }
       });
     });
     return stepperRow;
@@ -811,6 +828,7 @@
         card.querySelector('.card-action-add').addEventListener('click', (e) => {
           e.stopPropagation();
           popBtn(e.currentTarget);
+          floatToBar(e.currentTarget, groupKey, false);
           logExercise(ex.id, { skipRender: true });
           flashDots(card, ex.id);
           setTimeout(() => {
@@ -822,6 +840,7 @@
         card.querySelector('.card-action-heavy').addEventListener('click', (e) => {
           e.stopPropagation();
           popBtn(e.currentTarget);
+          floatToBar(e.currentTarget, groupKey, true);
           logExercise(ex.id, { push: true, skipRender: true, noPushWindow: true });
           flashDots(card, ex.id);
           setTimeout(() => {
@@ -1255,6 +1274,46 @@
     btn.classList.add('btn-pop');
   }
 
+  function floatToBar(btn, groupKey, isHeavy) {
+    const container = document.getElementById('summary-bars');
+    const barRow = container.querySelector(`.summary-row[data-group="${groupKey}"]`);
+    if (!barRow) return;
+    const barTrack = barRow.querySelector('.summary-bar-track');
+    if (!barTrack) return;
+
+    const btnRect = btn.getBoundingClientRect();
+    const barRect = barTrack.getBoundingClientRect();
+    const color = GROUP_COLORS[groupKey] || '#6c63ff';
+
+    const dot = document.createElement('div');
+    dot.textContent = isHeavy ? '🔥' : '+1';
+    dot.style.cssText = `
+      position: fixed;
+      left: ${btnRect.left + btnRect.width / 2}px;
+      top: ${btnRect.top + btnRect.height / 2}px;
+      transform: translate(-50%, -50%) scale(1);
+      font-size: ${isHeavy ? '1.2rem' : '0.85rem'};
+      font-weight: 700;
+      color: ${isHeavy ? '#ff9f43' : color};
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 1;
+      text-shadow: 0 0 8px ${isHeavy ? 'rgba(255,159,67,0.6)' : color + '80'};
+      transition: all 0.45s cubic-bezier(0.2, 0, 0.2, 1);
+      will-change: transform, top, left, opacity;
+    `;
+    document.body.appendChild(dot);
+
+    requestAnimationFrame(() => {
+      dot.style.left = `${barRect.left + barRect.width * 0.7}px`;
+      dot.style.top = `${barRect.top + barRect.height / 2}px`;
+      dot.style.transform = 'translate(-50%, -50%) scale(0.5)';
+      dot.style.opacity = '0.3';
+    });
+
+    setTimeout(() => dot.remove(), 500);
+  }
+
   function flashDots(card, exerciseId) {
     const dotsEl = card.querySelector('.exercise-sets');
     if (!dotsEl) return;
@@ -1583,16 +1642,23 @@
     const wrapperH = wrapper.offsetHeight;
     wrapper.style.height = wrapperH + 'px';
     wrapper.style.overflow = 'hidden';
+    wrapper.style.marginTop = '0px';
     void wrapper.offsetHeight;
 
-    wrapper.style.transition = `height ${(cardAnimTime / 1000).toFixed(2)}s cubic-bezier(0.4, 0, 1, 1)`;
+    // Collapse height and eat the flex gap via negative margin so removal is seamless
+    wrapper.style.transition = `height ${(cardAnimTime / 1000).toFixed(2)}s cubic-bezier(0.4, 0, 1, 1), margin-top ${(cardAnimTime / 1000).toFixed(2)}s cubic-bezier(0.4, 0, 1, 1)`;
     wrapper.style.height = '0';
+    wrapper.style.marginTop = '-10px';
 
-    // Clean up DOM after wrapper reaches 0
-    setTimeout(() => {
+    // Clean up DOM after transition ends — use event for precise timing
+    const cleanup = () => {
+      wrapper.removeEventListener('transitionend', cleanup);
       if (wrapper.parentElement) wrapper.remove();
       animatingGroups.delete(groupKey);
-    }, cardAnimTime + 80);
+    };
+    wrapper.addEventListener('transitionend', cleanup);
+    // Safety fallback in case transitionend doesn't fire
+    setTimeout(cleanup, cardAnimTime + 100);
   }
 
   // ===== Init =====

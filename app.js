@@ -217,21 +217,24 @@
   let expandedGroups = new Set(); // track which muscle groups are expanded
   let animatingGroups = new Set(); // guard against rapid taps during animation
   let expandedExercise = null; // track which exercise card is expanded
+  let animateCardChevron = null; // Set of exerciseIds whose chevrons should animate on next render
   let skipActionAnim = false; // suppress action button animation on re-render
   let pushWindow = null; // { exerciseId, ts, timer }
   let lastCelebratedMilestone = 0; // track highest milestone celebrated this session
   let cardioCelebratedToday = false;
   const celebratedGoals = new Set(); // track groups that have been goal-celebrated this session
+  const celebrationQueue = [];
+  let celebrationPlaying = false;
   const _sanitizeEl = document.createElement('div');
 
   // Milestone tiers for non-cardio daily sets
   const MILESTONES = [
-    { sets: 3,  label: 'Warming Up', emoji: '🔥', particles: 14,  duration: 1500, vibrate: [50] },
-    { sets: 6,  label: 'Getting Strong', emoji: '💪', particles: 24, duration: 2000, vibrate: [50, 30, 50] },
-    { sets: 9,  label: 'On Fire', emoji: '🔥🔥', particles: 36, duration: 2400, vibrate: [50, 30, 80] },
-    { sets: 12, label: 'Beast Mode', emoji: '⚡', particles: 50, duration: 2800, vibrate: [60, 40, 60, 40, 100] },
-    { sets: 15, label: 'Unstoppable', emoji: '🚀', particles: 70, duration: 3200, vibrate: [80, 50, 80, 50, 150] },
-    { sets: 18, label: 'Legend', emoji: '🏆', particles: 95, duration: 3600, vibrate: [100, 60, 100, 60, 200] },
+    { sets: 3,  label: 'Warming Up', emoji: '🔥', particles: 14,  duration: 2500, vibrate: [50] },
+    { sets: 6,  label: 'Getting Strong', emoji: '💪', particles: 24, duration: 3300, vibrate: [50, 30, 50] },
+    { sets: 9,  label: 'On Fire', emoji: '🔥🔥', particles: 36, duration: 4000, vibrate: [50, 30, 80] },
+    { sets: 12, label: 'Beast Mode', emoji: '⚡', particles: 50, duration: 4600, vibrate: [60, 40, 60, 40, 100] },
+    { sets: 15, label: 'Unstoppable', emoji: '🚀', particles: 70, duration: 5200, vibrate: [80, 50, 80, 50, 150] },
+    { sets: 18, label: 'Legend', emoji: '🏆', particles: 95, duration: 5800, vibrate: [100, 60, 100, 60, 200] },
   ];
 
   // ===== Persistence (localStorage) =====
@@ -661,6 +664,18 @@
     } else {
       wrapper.appendChild(newEx);
     }
+    // Animate card chevrons if flagged
+    if (animateCardChevron) {
+      newEx.querySelectorAll('.exercise-card').forEach(c => {
+        const chevron = c.querySelector('.card-chevron');
+        if (!chevron) return;
+        const isExpanded = c.classList.contains('expanded');
+        void chevron.offsetWidth; // force layout so transition fires
+        if (isExpanded) chevron.classList.add('open');
+        else chevron.classList.remove('open');
+      });
+      animateCardChevron = null;
+    }
     // Also update the bar fill for this group
     const row = container.querySelector(`.summary-row[data-group="${groupKey}"]`);
     if (row) {
@@ -764,10 +779,13 @@
       const prBadgeHtml = pr ? `<span class="pr-badge">PR: ${sanitize(pr.value)}${pr.unit ? ' ' + sanitize(pr.unit) : ''}</span>` : '';
 
       const isExerciseExpanded = expandedExercise === ex.id;
+      const shouldAnimateChevron = animateCardChevron && animateCardChevron.has(ex.id);
+      // If animating, render in the *opposite* state so CSS transition plays
+      const chevronOpen = shouldAnimateChevron ? !isExerciseExpanded : isExerciseExpanded;
 
       card.innerHTML = `
         <div class="card-inner">
-          <span class="card-chevron${isExerciseExpanded ? ' open' : ''}">›</span>
+          <span class="card-chevron${chevronOpen ? ' open' : ''}">›</span>
           <div class="exercise-icon">${ex.icon}</div>
           <div class="exercise-info">
             <div class="exercise-name">${sanitize(ex.name)}</div>
@@ -787,6 +805,8 @@
       // Tap on card header to toggle expand/collapse
       card.querySelector('.card-inner').addEventListener('click', () => {
         if (expandedExercise === ex.id) {
+          const chevron = card.querySelector('.card-chevron');
+          if (chevron) chevron.classList.remove('open');
           const actions = card.querySelector('.card-actions');
           if (actions) {
             const btns = Array.from(actions.querySelectorAll('.card-action-item'));
@@ -818,6 +838,8 @@
           }
           expandedExercise = null;
         } else {
+          animateCardChevron = new Set([ex.id]);
+          if (expandedExercise) animateCardChevron.add(expandedExercise);
           expandedExercise = ex.id;
         }
         refreshGroupExercises(groupKey);
@@ -829,6 +851,7 @@
           e.stopPropagation();
           popBtn(e.currentTarget);
           floatToBar(e.currentTarget, groupKey, false);
+          floatToStreak(e.currentTarget, false);
           logExercise(ex.id, { skipRender: true });
           flashDots(card, ex.id);
           setTimeout(() => {
@@ -841,6 +864,7 @@
           e.stopPropagation();
           popBtn(e.currentTarget);
           floatToBar(e.currentTarget, groupKey, true);
+          floatToStreak(e.currentTarget, true);
           logExercise(ex.id, { push: true, skipRender: true, noPushWindow: true });
           flashDots(card, ex.id);
           setTimeout(() => {
@@ -1159,7 +1183,20 @@
 
   // ===== Celebrations (milestones, group goals, cardio) =====
 
+  function queueCelebration(playFn) {
+    celebrationQueue.push(playFn);
+    if (!celebrationPlaying) drainCelebrationQueue();
+  }
+
+  function drainCelebrationQueue() {
+    if (celebrationQueue.length === 0) { celebrationPlaying = false; return; }
+    celebrationPlaying = true;
+    const playFn = celebrationQueue.shift();
+    playFn(() => drainCelebrationQueue());
+  }
+
   function celebrateGroupGoal(groupKey) {
+    queueCelebration((done) => {
     haptic([100, 60, 100, 60, 200]);
 
     const group = MUSCLE_GROUPS[groupKey];
@@ -1218,11 +1255,13 @@
 
     setTimeout(() => {
       overlay.classList.add('celebrate-fade');
-      setTimeout(() => overlay.remove(), 500);
-    }, 3800);
+      setTimeout(() => { overlay.remove(); done(); }, 500);
+    }, 6000);
+    });
   }
 
   function celebrateCardio() {
+    queueCelebration((done) => {
     haptic([60, 40, 80]);
 
     const overlay = document.createElement('div');
@@ -1251,8 +1290,9 @@
 
     setTimeout(() => {
       overlay.classList.add('celebrate-fade');
-      setTimeout(() => overlay.remove(), 500);
-    }, 2400);
+      setTimeout(() => { overlay.remove(); done(); }, 500);
+    }, 4000);
+    });
   }
 
   function checkMilestone(dailySets) {
@@ -1285,33 +1325,96 @@
     const barRect = barTrack.getBoundingClientRect();
     const color = GROUP_COLORS[groupKey] || '#6c63ff';
 
+    // Randomize the arc
+    const startX = btnRect.left + btnRect.width / 2;
+    const startY = btnRect.top + btnRect.height / 2;
+    const endX = barRect.left + barRect.width * (0.55 + Math.random() * 0.3);
+    const endY = barRect.top + barRect.height / 2;
+    const drift = (Math.random() - 0.5) * 40;
+    const duration = 400 + Math.random() * 150;
+    const startScale = 0.9 + Math.random() * 0.3;
+
     const dot = document.createElement('div');
     dot.textContent = isHeavy ? '🔥' : '+1';
     dot.style.cssText = `
       position: fixed;
-      left: ${btnRect.left + btnRect.width / 2}px;
-      top: ${btnRect.top + btnRect.height / 2}px;
-      transform: translate(-50%, -50%) scale(1);
-      font-size: ${isHeavy ? '1.2rem' : '0.85rem'};
+      left: 0;
+      top: 0;
+      font-size: ${isHeavy ? '2rem' : '1.5rem'};
       font-weight: 700;
       color: ${isHeavy ? '#ff9f43' : color};
       pointer-events: none;
       z-index: 9999;
-      opacity: 1;
       text-shadow: 0 0 8px ${isHeavy ? 'rgba(255,159,67,0.6)' : color + '80'};
-      transition: all 0.45s cubic-bezier(0.2, 0, 0.2, 1);
-      will-change: transform, top, left, opacity;
+      will-change: transform, opacity;
     `;
     document.body.appendChild(dot);
 
-    requestAnimationFrame(() => {
-      dot.style.left = `${barRect.left + barRect.width * 0.7}px`;
-      dot.style.top = `${barRect.top + barRect.height / 2}px`;
-      dot.style.transform = 'translate(-50%, -50%) scale(0.5)';
-      dot.style.opacity = '0.3';
-    });
+    const startTime = performance.now();
+    function animate(now) {
+      const t = Math.min((now - startTime) / duration, 1);
+      // Ease-out cubic
+      const ease = 1 - Math.pow(1 - t, 3);
+      const x = startX + (endX - startX) * ease + drift * Math.sin(t * Math.PI);
+      const y = startY + (endY - startY) * ease - 30 * Math.sin(t * Math.PI);
+      const scale = startScale + (0.4 - startScale) * ease;
+      const opacity = 1 - t * 0.7;
+      dot.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%) scale(${scale.toFixed(2)})`;
+      dot.style.opacity = opacity.toFixed(2);
+      if (t < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        dot.remove();
+      }
+    }
+    requestAnimationFrame(animate);
+  }
 
-    setTimeout(() => dot.remove(), 500);
+  function floatToStreak(btn, isHeavy) {
+    const badge = document.getElementById('streak-badge');
+    if (!badge || badge.classList.contains('hidden')) return;
+
+    const btnRect = btn.getBoundingClientRect();
+    const badgeRect = badge.getBoundingClientRect();
+
+    const startX = btnRect.left + btnRect.width / 2;
+    const startY = btnRect.top + btnRect.height / 2;
+    const endX = badgeRect.left + badgeRect.width / 2 + (Math.random() - 0.5) * 10;
+    const endY = badgeRect.top + badgeRect.height / 2;
+    const drift = (Math.random() - 0.5) * 30;
+    const duration = 420 + Math.random() * 130;
+    const startScale = 0.8 + Math.random() * 0.3;
+
+    const dot = document.createElement('div');
+    dot.textContent = isHeavy ? '🔥' : '⚡';
+    dot.style.cssText = `
+      position: fixed;
+      left: 0;
+      top: 0;
+      font-size: 1.5rem;
+      pointer-events: none;
+      z-index: 9999;
+      will-change: transform, opacity;
+    `;
+    document.body.appendChild(dot);
+
+    const startTime = performance.now();
+    function animate(now) {
+      const t = Math.min((now - startTime) / duration, 1);
+      const ease = 1 - Math.pow(1 - t, 3);
+      const x = startX + (endX - startX) * ease + drift * Math.sin(t * Math.PI);
+      const y = startY + (endY - startY) * ease - 20 * Math.sin(t * Math.PI);
+      const scale = startScale + (0.3 - startScale) * ease;
+      const opacity = 1 - t * 0.6;
+      dot.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%) scale(${scale.toFixed(2)})`;
+      dot.style.opacity = opacity.toFixed(2);
+      if (t < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        dot.remove();
+      }
+    }
+    requestAnimationFrame(animate);
   }
 
   function flashDots(card, exerciseId) {
@@ -1348,6 +1451,7 @@
   }
 
   function celebrateMilestone(ms) {
+    queueCelebration((done) => {
     haptic(ms.vibrate);
 
     const tierIndex = MILESTONES.indexOf(ms);
@@ -1438,8 +1542,9 @@
 
     setTimeout(() => {
       overlay.classList.add('celebrate-fade');
-      setTimeout(() => overlay.remove(), 500);
+      setTimeout(() => { overlay.remove(); done(); }, 500);
     }, ms.duration);
+    });
   }
 
   // ===== Streak Badge =====

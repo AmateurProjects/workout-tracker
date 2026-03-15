@@ -385,7 +385,7 @@ body {
   transition: opacity 0.25s ease;
 }
 
-.has-expanded-exercise .exercise-card:not(.expanded) {
+.has-expanded-exercise .exercise-card:not(.expanded):not(.exercise-card-add) {
   opacity: 0.35;
 }
 
@@ -760,6 +760,9 @@ body {
   z-index: 300;
   pointer-events: none;
   overflow: hidden;
+  background: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   transition: opacity 0.5s ease;
 }
 
@@ -779,7 +782,18 @@ body {
   text-shadow: 0 2px 24px rgba(108, 99, 255, 0.7), 0 0 50px rgba(74, 222, 128, 0.5);
   white-space: nowrap;
   animation: bannerPop 0.6s cubic-bezier(0.34, 1.8, 0.64, 1) 0.1s forwards;
-  z-index: 2;
+  z-index: 10;
+  padding: 12px 28px;
+  border-radius: 16px;
+}
+
+.celebrate-banner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  border-radius: 16px;
+  z-index: -1;
 }
 
 @keyframes bannerPop {

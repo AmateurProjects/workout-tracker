@@ -649,6 +649,44 @@
     container.classList.toggle('has-expanded', expandedGroups.size > 0);
   }
 
+  // Swap only the exercise cards inside an already-expanded group (leaves stepper & rows untouched)
+  function refreshGroupExercises(groupKey) {
+    const container = document.getElementById('summary-bars');
+    const wrapper = container.querySelector(`.group-expanded-wrapper[data-group="${groupKey}"]`);
+    if (!wrapper) return;
+    const oldEx = wrapper.querySelector('.group-exercises');
+    const newEx = buildExerciseContainer(groupKey);
+    if (oldEx) {
+      wrapper.replaceChild(newEx, oldEx);
+    } else {
+      wrapper.appendChild(newEx);
+    }
+    // Also update the bar fill for this group
+    const row = container.querySelector(`.summary-row[data-group="${groupKey}"]`);
+    if (row) {
+      const target = getTarget(groupKey);
+      const { total: vol, pushed: pushVol } = getGroupStats14Days(groupKey);
+      const color = GROUP_COLORS[groupKey] || '#6c63ff';
+      const fillPct = target > 0 ? Math.min((vol / target) * 100, 100) : 0;
+      const pushPct = target > 0 ? Math.min((pushVol / target) * 100, 100) : 0;
+      const fill = row.querySelector('.summary-bar-fill');
+      if (fill) { fill.style.width = fillPct + '%'; fill.style.background = color; }
+      const push = row.querySelector('.summary-bar-push');
+      if (push) push.style.width = pushPct + '%';
+      else if (pushVol > 0) {
+        const track = row.querySelector('.summary-bar-track');
+        if (track) {
+          const pushEl = document.createElement('div');
+          pushEl.className = 'summary-bar-push';
+          pushEl.style.width = pushPct + '%';
+          track.insertBefore(pushEl, track.querySelector('.summary-bar-value'));
+        }
+      }
+      const valSpan = row.querySelector('.summary-bar-value');
+      if (valSpan) valSpan.textContent = `${vol} / ${target}`;
+    }
+  }
+
   function buildStepperRow(groupKey, target) {
     const stepperRow = document.createElement('div');
     stepperRow.className = 'target-stepper-row';
@@ -757,7 +795,7 @@
             }, foldDelay);
             setTimeout(() => {
               expandedExercise = null;
-              renderSummary();
+              refreshGroupExercises(groupKey);
             }, foldDelay + 200);
             return;
           }
@@ -765,7 +803,7 @@
         } else {
           expandedExercise = ex.id;
         }
-        renderSummary();
+        refreshGroupExercises(groupKey);
       });
 
       // Action button handlers
@@ -777,7 +815,7 @@
           flashDots(card, ex.id);
           setTimeout(() => {
             skipActionAnim = true;
-            renderAll();
+            refreshGroupExercises(groupKey);
             skipActionAnim = false;
           }, 180);
         });
@@ -788,7 +826,7 @@
           flashDots(card, ex.id);
           setTimeout(() => {
             skipActionAnim = true;
-            renderAll();
+            refreshGroupExercises(groupKey);
             skipActionAnim = false;
           }, 180);
         });
@@ -799,7 +837,7 @@
           flashDots(card, ex.id);
           setTimeout(() => {
             skipActionAnim = true;
-            renderAll();
+            refreshGroupExercises(groupKey);
             skipActionAnim = false;
           }, 180);
         });
@@ -1505,7 +1543,8 @@
     const cards = Array.from(wrapper.querySelectorAll('.exercise-card'));
     const stepper = wrapper.querySelector('.target-stepper-row');
     const last = cards.length - 1;
-    const cardAnimTime = last * 60 + 320;
+    const stagger = 45;
+    const cardAnimTime = last * stagger + 280;
 
     // Promote cards to own GPU layers before animating
     cards.forEach(card => {
@@ -1517,29 +1556,29 @@
     void wrapper.offsetHeight;
 
     cards.forEach((card, i) => {
-      const delay = (last - i) * 60;
-      card.style.transition = `opacity 0.2s ease ${delay}ms, transform 0.25s ease ${delay}ms`;
+      const delay = (last - i) * stagger;
+      card.style.transition = `opacity 0.18s ease-out ${delay}ms, transform 0.22s ease-out ${delay}ms`;
       card.style.opacity = '0';
       card.style.transform = 'translate3d(0, -8px, 0)';
     });
 
-    // Fade stepper row in sync with the last card
+    // Fade stepper row early alongside the first cards
     if (stepper) {
-      stepper.style.transition = `opacity 0.2s ease ${cardAnimTime - 200}ms`;
+      stepper.style.transition = `opacity 0.18s ease-out ${stagger}ms`;
       stepper.style.opacity = '0';
     }
 
-    // Lock wrapper height, then collapse smoothly after cards fade
+    // Lock wrapper height, then collapse smoothly overlapping with card fades
     const wrapperH = wrapper.offsetHeight;
     wrapper.style.height = wrapperH + 'px';
     wrapper.style.overflow = 'hidden';
 
-    const collapseDelay = Math.min(cardAnimTime * 0.6, 250);
+    const collapseDelay = Math.min(last * stagger * 0.45, 150);
 
     // Double rAF ensures the browser has painted the locked height before transitioning
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        wrapper.style.transition = `height ${((cardAnimTime - collapseDelay + 100) / 1000).toFixed(2)}s cubic-bezier(0.4, 0, 0.2, 1) ${collapseDelay}ms`;
+        wrapper.style.transition = `height 0.25s ease-in ${collapseDelay}ms`;
         wrapper.style.height = '0';
       });
     });
@@ -1548,7 +1587,7 @@
     setTimeout(() => {
       if (wrapper.parentElement) wrapper.remove();
       animatingGroups.delete(groupKey);
-    }, cardAnimTime + 120);
+    }, cardAnimTime + 80);
   }
 
   // ===== Init =====

@@ -409,7 +409,11 @@
   }
 
   // ===== Actions (log, undo, push sets) =====
-  function logExercise(exerciseId) {
+  function logExercise(exerciseId, opts) {
+    const push = opts && opts.push;
+    const skipRender = opts && opts.skipRender;
+    const noPushWindow = opts && opts.noPushWindow;
+
     if (!data.logs[exerciseId]) data.logs[exerciseId] = [];
 
     // Snapshot before logging
@@ -418,6 +422,7 @@
     const target = groupKey ? getTarget(groupKey) : 0;
 
     const entry = { date: todayStr(), ts: Date.now() };
+    if (push) entry.push = true;
     data.logs[exerciseId].push(entry);
     saveData();
 
@@ -441,13 +446,16 @@
     }
 
     // Open push window
-    if (pushWindow) clearTimeout(pushWindow.timer);
-    pushWindow = { exerciseId, ts: entry.ts, timer: setTimeout(clearPushWindow, 3000) };
+    if (pushWindow) { clearTimeout(pushWindow.timer); pushWindow = null; }
+    if (!noPushWindow) {
+      pushWindow = { exerciseId, ts: entry.ts, timer: setTimeout(clearPushWindow, 3000) };
+    }
 
-    renderAll();
+    if (!skipRender) renderAll();
   }
 
-  function removeLastTodaySet(exerciseId) {
+  function removeLastTodaySet(exerciseId, opts) {
+    const skipRender = opts && opts.skipRender;
     const today = todayStr();
     const logs = data.logs[exerciseId] || [];
     for (let i = logs.length - 1; i >= 0; i--) {
@@ -455,7 +463,7 @@
         logs.splice(i, 1);
         saveData();
         updateStreakBadge(getDailySetCount());
-        renderAll();
+        if (!skipRender) renderAll();
         return;
       }
     }
@@ -624,13 +632,17 @@
 
       container.appendChild(row);
 
-      // If expanded, add stepper + exercises inline
+      // If expanded, add stepper + exercises inside a wrapper (matches animation structure)
       if (isExpanded) {
-        const stepperRow = buildStepperRow(key, target);
-        container.appendChild(stepperRow);
+        const wrapper = document.createElement('div');
+        wrapper.className = 'group-expanded-wrapper';
+        wrapper.dataset.group = key;
 
+        const stepperRow = buildStepperRow(key, target);
         const exContainer = buildExerciseContainer(key);
-        container.appendChild(exContainer);
+        wrapper.appendChild(stepperRow);
+        wrapper.appendChild(exContainer);
+        container.appendChild(wrapper);
       }
     }
   }
@@ -758,12 +770,7 @@
         card.querySelector('.card-action-add').addEventListener('click', (e) => {
           e.stopPropagation();
           popBtn(e.currentTarget);
-          if (!data.logs[ex.id]) data.logs[ex.id] = [];
-          const entry = { date: todayStr(), ts: Date.now() };
-          data.logs[ex.id].push(entry);
-          saveData();
-          if (pushWindow) clearTimeout(pushWindow.timer);
-          pushWindow = { exerciseId: ex.id, ts: entry.ts, timer: setTimeout(clearPushWindow, 3000) };
+          logExercise(ex.id, { skipRender: true });
           flashDots(card, ex.id);
           setTimeout(() => {
             skipActionAnim = true;
@@ -774,11 +781,7 @@
         card.querySelector('.card-action-heavy').addEventListener('click', (e) => {
           e.stopPropagation();
           popBtn(e.currentTarget);
-          if (!data.logs[ex.id]) data.logs[ex.id] = [];
-          const entry = { date: todayStr(), ts: Date.now(), push: true };
-          data.logs[ex.id].push(entry);
-          saveData();
-          if (pushWindow) { clearTimeout(pushWindow.timer); pushWindow = null; }
+          logExercise(ex.id, { push: true, skipRender: true, noPushWindow: true });
           flashDots(card, ex.id);
           setTimeout(() => {
             skipActionAnim = true;
@@ -789,11 +792,7 @@
         card.querySelector('.card-action-remove').addEventListener('click', (e) => {
           e.stopPropagation();
           popBtn(e.currentTarget);
-          const today = todayStr();
-          const logs = data.logs[ex.id] || [];
-          for (let ri = logs.length - 1; ri >= 0; ri--) {
-            if (logs[ri].date === today) { logs.splice(ri, 1); saveData(); break; }
-          }
+          removeLastTodaySet(ex.id, { skipRender: true });
           flashDots(card, ex.id);
           setTimeout(() => {
             skipActionAnim = true;
@@ -1416,60 +1415,53 @@
     const chevron = row.querySelector('.summary-chevron');
     if (chevron) chevron.classList.add('open');
 
-    // Build stepper
+    // Build stepper + exercises inside a single wrapper (one flex item = one gap)
+    const wrapper = document.createElement('div');
+    wrapper.className = 'group-expanded-wrapper';
+    wrapper.dataset.group = groupKey;
+
     const target = getTarget(groupKey);
     const stepperRow = buildStepperRow(groupKey, target);
-
-    // Build exercise container
     const exContainer = buildExerciseContainer(groupKey);
+    wrapper.appendChild(stepperRow);
+    wrapper.appendChild(exContainer);
 
-    // Find insertion point — after the row
-    row.insertAdjacentElement('afterend', stepperRow);
-    stepperRow.insertAdjacentElement('afterend', exContainer);
+    // Insert wrapper after the row
+    row.insertAdjacentElement('afterend', wrapper);
 
-    // Animate stepper in
-    stepperRow.style.opacity = '0';
-    stepperRow.style.overflow = 'hidden';
-    stepperRow.style.height = 'auto';
-    const stepperNatHeight = stepperRow.offsetHeight;
-    stepperRow.style.height = '0';
-    void stepperRow.offsetHeight;
-    stepperRow.style.transition = 'height 0.25s ease-out, opacity 0.2s ease';
-    stepperRow.style.height = stepperNatHeight + 'px';
-    stepperRow.style.opacity = '1';
-    setTimeout(() => {
-      stepperRow.style.height = '';
-      stepperRow.style.overflow = '';
-      stepperRow.style.transition = '';
-    }, 300);
+    // Measure natural height, then animate from 0
+    const naturalH = wrapper.offsetHeight;
+    wrapper.style.height = '0';
+    wrapper.style.overflow = 'hidden';
+    void wrapper.offsetHeight;
 
-    // Animate exercise cards — staggered top to bottom
+    wrapper.style.transition = 'height 0.3s ease-out';
+    wrapper.style.height = naturalH + 'px';
+
+    // Animate exercise cards staggered top to bottom
     const cards = Array.from(exContainer.querySelectorAll('.exercise-card'));
-    cards.forEach(card => { card.style.display = 'none'; });
+    cards.forEach(card => {
+      card.style.opacity = '0';
+      card.style.transform = 'translateY(-8px)';
+    });
 
     cards.forEach((card, i) => {
       setTimeout(() => {
-        card.style.display = '';
-        card.style.minHeight = '0';
-        card.style.opacity = '0';
-        const naturalHeight = card.offsetHeight;
-        card.style.overflow = 'hidden';
-        card.style.height = '0';
-        void card.offsetHeight;
-        card.style.transition = 'height 0.3s ease-out, opacity 0.25s ease';
-        card.style.height = naturalHeight + 'px';
+        card.style.transition = 'opacity 0.25s ease, transform 0.3s ease-out';
         card.style.opacity = '1';
+        card.style.transform = 'translateY(0)';
       }, i * 60 + 80);
-
-      setTimeout(() => {
-        card.style.height = '';
-        card.style.overflow = '';
-        card.style.transition = '';
-        card.style.minHeight = '';
-      }, i * 60 + 80 + 350);
     });
 
     const totalTime = cards.length * 60 + 80 + 350;
+
+    // Unlock wrapper height after it finishes expanding
+    setTimeout(() => {
+      wrapper.style.height = '';
+      wrapper.style.overflow = '';
+      wrapper.style.transition = '';
+    }, totalTime);
+
     setTimeout(() => {
       animatingGroups.delete(groupKey);
     }, totalTime);
@@ -1482,8 +1474,7 @@
 
     const container = document.getElementById('summary-bars');
     const row = container.querySelector(`.summary-row[data-group="${groupKey}"]`);
-    const exContainer = container.querySelector(`.group-exercises[data-group="${groupKey}"]`);
-    const stepperRow = container.querySelector(`.target-stepper-row[data-group="${groupKey}"]`);
+    const wrapper = container.querySelector(`.group-expanded-wrapper[data-group="${groupKey}"]`);
 
     // Update row styling
     if (row) {
@@ -1492,69 +1483,40 @@
       if (chevron) chevron.classList.remove('open');
     }
 
-    if (!exContainer) {
-      if (stepperRow) stepperRow.remove();
+    if (!wrapper) {
       animatingGroups.delete(groupKey);
       return;
     }
 
-    // Mirror the expand: stagger each card collapsing (height + opacity), bottom to top
-    const cards = Array.from(exContainer.querySelectorAll('.exercise-card'));
+    // Stagger card opacity+transform out (bottom to top) — GPU composited
+    const cards = Array.from(wrapper.querySelectorAll('.exercise-card'));
     const last = cards.length - 1;
     const cardAnimTime = last * 60 + 320;
 
-    // Snapshot all heights in one read pass (no interleaved reads/writes)
-    const heights = cards.map(card => card.offsetHeight);
-
-    // Also snapshot the full container + stepper heights before any writes
-    const fullContainerH = exContainer.offsetHeight;
-    const stepperH = stepperRow ? stepperRow.offsetHeight : 0;
-
-    // Lock all cards to their current height in one write pass
     cards.forEach((card, i) => {
-      card.style.height = heights[i] + 'px';
-      card.style.overflow = 'hidden';
-      card.style.minHeight = '0';
+      const delay = (last - i) * 60;
+      card.style.transition = `opacity 0.2s ease ${delay}ms, transform 0.25s ease ${delay}ms`;
+      card.style.opacity = '0';
+      card.style.transform = 'translateY(-8px)';
     });
 
-    // Lock the container to its current height so we control the collapse
-    exContainer.style.height = fullContainerH + 'px';
-    exContainer.style.overflow = 'hidden';
+    // Lock wrapper height, then collapse smoothly after cards fade
+    const wrapperH = wrapper.offsetHeight;
+    wrapper.style.height = wrapperH + 'px';
+    wrapper.style.overflow = 'hidden';
 
-    if (stepperRow) {
-      stepperRow.style.height = stepperH + 'px';
-      stepperRow.style.overflow = 'hidden';
-    }
+    const collapseDelay = Math.min(cardAnimTime * 0.6, 250);
 
-    // Stagger collapse bottom-to-top — matching expand's 60ms stagger + 0.3s duration
     requestAnimationFrame(() => {
-      // Cards collapse individually for staggered visual
-      cards.forEach((card, i) => {
-        const delay = (last - i) * 60;
-        card.style.transition = `height 0.3s cubic-bezier(0.4, 0, 0.2, 1) ${delay}ms, opacity 0.25s ease ${delay}ms`;
-        card.style.height = '0';
-        card.style.opacity = '0';
-      });
-
-      // Container collapses smoothly to 0 over the full duration (eats gap space too)
-      exContainer.style.transition = `height ${(cardAnimTime / 1000).toFixed(2)}s cubic-bezier(0.4, 0, 0.2, 1)`;
-      exContainer.style.height = '0';
-
-      // Stepper collapses alongside
-      if (stepperRow) {
-        const stepperDelay = Math.max(0, cardAnimTime - 250);
-        stepperRow.style.transition = `height 0.3s cubic-bezier(0.4, 0, 0.2, 1) ${stepperDelay}ms, opacity 0.25s ease ${stepperDelay}ms`;
-        stepperRow.style.height = '0';
-        stepperRow.style.opacity = '0';
-      }
+      wrapper.style.transition = `height ${((cardAnimTime - collapseDelay + 100) / 1000).toFixed(2)}s cubic-bezier(0.4, 0, 0.2, 1) ${collapseDelay}ms`;
+      wrapper.style.height = '0';
     });
 
-    // Clean up DOM after everything finishes
+    // Clean up DOM after wrapper reaches 0
     setTimeout(() => {
-      if (exContainer.parentElement) exContainer.remove();
-      if (stepperRow && stepperRow.parentElement) stepperRow.remove();
+      if (wrapper.parentElement) wrapper.remove();
       animatingGroups.delete(groupKey);
-    }, cardAnimTime + 100);
+    }, cardAnimTime + 120);
   }
 
   // ===== Init =====

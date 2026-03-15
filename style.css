@@ -121,6 +121,10 @@ body {
 }
 
 /* ===== Group Exercises (accordion) ===== */
+.group-expanded-wrapper {
+  overflow: hidden;
+}
+
 .group-exercises {
   display: flex;
   flex-direction: column;

@@ -1501,9 +1501,14 @@
     // Mirror the expand: stagger each card collapsing (height + opacity), bottom to top
     const cards = Array.from(exContainer.querySelectorAll('.exercise-card'));
     const last = cards.length - 1;
+    const cardAnimTime = last * 60 + 320;
 
     // Snapshot all heights in one read pass (no interleaved reads/writes)
     const heights = cards.map(card => card.offsetHeight);
+
+    // Also snapshot the full container + stepper heights before any writes
+    const fullContainerH = exContainer.offsetHeight;
+    const stepperH = stepperRow ? stepperRow.offsetHeight : 0;
 
     // Lock all cards to their current height in one write pass
     cards.forEach((card, i) => {
@@ -1512,32 +1517,37 @@
       card.style.minHeight = '0';
     });
 
-    // Collapse container gap so it shrinks with cards
-    exContainer.style.transition = 'none';
+    // Lock the container to its current height so we control the collapse
+    exContainer.style.height = fullContainerH + 'px';
+    exContainer.style.overflow = 'hidden';
+
+    if (stepperRow) {
+      stepperRow.style.height = stepperH + 'px';
+      stepperRow.style.overflow = 'hidden';
+    }
 
     // Stagger collapse bottom-to-top — matching expand's 60ms stagger + 0.3s duration
     requestAnimationFrame(() => {
+      // Cards collapse individually for staggered visual
       cards.forEach((card, i) => {
         const delay = (last - i) * 60;
         card.style.transition = `height 0.3s cubic-bezier(0.4, 0, 0.2, 1) ${delay}ms, opacity 0.25s ease ${delay}ms`;
         card.style.height = '0';
         card.style.opacity = '0';
       });
-    });
 
-    const cardAnimTime = last * 60 + 320;
+      // Container collapses smoothly to 0 over the full duration (eats gap space too)
+      exContainer.style.transition = `height ${(cardAnimTime / 1000).toFixed(2)}s cubic-bezier(0.4, 0, 0.2, 1)`;
+      exContainer.style.height = '0';
 
-    // Collapse stepper alongside the last few cards
-    if (stepperRow) {
-      const stepperH = stepperRow.offsetHeight;
-      stepperRow.style.height = stepperH + 'px';
-      stepperRow.style.overflow = 'hidden';
-      requestAnimationFrame(() => {
-        stepperRow.style.transition = `height 0.3s cubic-bezier(0.4, 0, 0.2, 1) ${Math.max(0, cardAnimTime - 250)}ms, opacity 0.25s ease ${Math.max(0, cardAnimTime - 250)}ms`;
+      // Stepper collapses alongside
+      if (stepperRow) {
+        const stepperDelay = Math.max(0, cardAnimTime - 250);
+        stepperRow.style.transition = `height 0.3s cubic-bezier(0.4, 0, 0.2, 1) ${stepperDelay}ms, opacity 0.25s ease ${stepperDelay}ms`;
         stepperRow.style.height = '0';
         stepperRow.style.opacity = '0';
-      });
-    }
+      }
+    });
 
     // Clean up DOM after everything finishes
     setTimeout(() => {

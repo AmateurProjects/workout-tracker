@@ -1787,9 +1787,7 @@
 
     // Set milestone baseline so page load doesn't re-trigger celebrations
     const initSets = getDailySetCount();
-    for (let i = MILESTONES.length - 1; i >= 0; i--) {
-      if (initSets >= MILESTONES[i].sets) { lastCelebratedMilestone = MILESTONES[i].sets; break; }
-    }
+    lastCelebratedMilestone = Math.floor(initSets / MILESTONE_INTERVAL) * MILESTONE_INTERVAL;
     // Mark groups that already hit their goal
     for (const key of Object.keys(MUSCLE_GROUPS)) {
       const vol = getGroupVolume14Days(key);

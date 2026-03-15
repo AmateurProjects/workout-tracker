@@ -377,10 +377,6 @@ body {
   padding: 18px;
 }
 
-.exercise-card .card-inner:active {
-  transform: scale(0.97);
-}
-
 .exercise-card {
   transition: opacity 0.25s ease;
 }
@@ -392,7 +388,7 @@ body {
 .exercise-card-add {
   border: 2px dashed var(--surface2);
   background: transparent;
-  opacity: 0.6;
+  opacity: 0.85;
   padding: 18px;
   gap: 14px;
 }
@@ -942,6 +938,7 @@ body {
   pointer-events: none;
   animation: starburstOut ease-out forwards;
   z-index: 1;
+  transform: translate(-50%, -50%);
 }
 
 @keyframes starburstOut {
@@ -967,6 +964,7 @@ body {
   pointer-events: none;
   animation: sparkPop 1.6s ease-out forwards;
   z-index: 1;
+  transform: translate(-50%, 0);
 }
 
 @keyframes sparkPop {
@@ -1021,7 +1019,7 @@ body {
 }
 
 .banner-gold::before {
-  background: none;
+  background: rgba(0, 0, 0, 0.85);
 }
 
 @keyframes goldShimmer {

@@ -289,15 +289,11 @@
     return CELEBRATION_PHRASES[pick];
   }
 
-  // Milestone tiers for non-cardio daily sets
-  const MILESTONES = [
-    { sets: 3,  particles: 14,  duration: 2500, vibrate: [50] },
-    { sets: 6,  particles: 24, duration: 3300, vibrate: [50, 30, 50] },
-    { sets: 9,  particles: 36, duration: 4000, vibrate: [50, 30, 80] },
-    { sets: 12, particles: 50, duration: 4600, vibrate: [60, 40, 60, 40, 100] },
-    { sets: 15, particles: 70, duration: 5200, vibrate: [80, 50, 80, 50, 150] },
-    { sets: 18, particles: 95, duration: 5800, vibrate: [100, 60, 100, 60, 200] },
-  ];
+  // Celebration fires every 3 non-cardio sets
+  const MILESTONE_INTERVAL = 3;
+  const MILESTONE_PARTICLES = 50;
+  const MILESTONE_DURATION = 3500;
+  const MILESTONE_VIBRATE = [50, 30, 80];
 
   // ===== Persistence (localStorage) =====
   // Data schema:
@@ -992,15 +988,15 @@
     title.textContent = `${ex.icon} ${sanitize(ex.name)}`;
     body.innerHTML = `
       <div class="options-menu">
-        <button class="options-btn" id="opt-edit">
-          <span class="options-icon">✏️</span>
-          <span class="options-label">Edit</span>
-          <span class="options-desc">Change name or emoji</span>
-        </button>
         <button class="options-btn" id="opt-pr">
           <span class="options-icon">🏅</span>
           <span class="options-label">Personal Record</span>
           <span class="options-desc">${prDisplay}</span>
+        </button>
+        <button class="options-btn" id="opt-edit">
+          <span class="options-icon">✏️</span>
+          <span class="options-label">Edit</span>
+          <span class="options-desc">Change name or emoji</span>
         </button>
         <button class="options-btn options-btn-danger" id="opt-delete">
           <span class="options-icon">🗑️</span>
@@ -1299,11 +1295,11 @@
 
     // Group-colored starburst particles
     const emojis = ['\u2b50', '\u2728', '\ud83c\udf1f', '\u26a1', group.icon, '\ud83c\udfc6'];
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 90; i++) {
       const p = document.createElement('div');
       p.className = 'starburst';
       p.textContent = emojis[Math.floor(Math.random() * emojis.length)];
-      const angle = (Math.PI * 2 * i) / 60 + (Math.random() - 0.5) * 0.4;
+      const angle = (Math.PI * 2 * i) / 90 + (Math.random() - 0.5) * 0.4;
       const dist = 140 + Math.random() * 300;
       p.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
       p.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
@@ -1315,7 +1311,7 @@
 
     // Group-colored confetti rain
     const shapes = ['\u25cf', '\u25a0', '\u2605', '\u25c6'];
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 70; i++) {
       const p = document.createElement('div');
       p.className = 'confetti';
       p.textContent = shapes[Math.floor(Math.random() * shapes.length)];
@@ -1352,7 +1348,7 @@
 
     // Swoosh trail particles — streak horizontally
     const emojis = ['\ud83c\udfc3', '\ud83d\udca8', '\u26a1', '\ud83d\udd25', '\ud83c\udf1f', '\u2728'];
-    for (let i = 0; i < 28; i++) {
+    for (let i = 0; i < 40; i++) {
       const p = document.createElement('div');
       p.className = 'swoosh';
       p.textContent = emojis[Math.floor(Math.random() * emojis.length)];
@@ -1370,15 +1366,10 @@
   }
 
   function checkMilestone(dailySets) {
-    // Find the highest milestone hit
-    let milestone = null;
-    for (let i = MILESTONES.length - 1; i >= 0; i--) {
-      if (dailySets >= MILESTONES[i].sets) { milestone = MILESTONES[i]; break; }
-    }
-    if (!milestone) return;
-    if (milestone.sets <= lastCelebratedMilestone) return;
-    lastCelebratedMilestone = milestone.sets;
-    celebrateMilestone(milestone);
+    if (dailySets < MILESTONE_INTERVAL || dailySets % MILESTONE_INTERVAL !== 0) return;
+    if (dailySets <= lastCelebratedMilestone) return;
+    lastCelebratedMilestone = dailySets;
+    celebrateMilestone();
   }
 
   function popBtn(btn) {
@@ -1398,7 +1389,7 @@
     const endX = targetRect.left + targetRect.width * (0.55 + Math.random() * 0.3);
     const endY = targetRect.top + targetRect.height / 2;
     const drift = (Math.random() - 0.5) * 40;
-    const duration = 400 + Math.random() * 150;
+    const duration = 800 + Math.random() * 200;
     const startScale = 0.9 + Math.random() * 0.3;
 
     const dot = document.createElement('div');
@@ -1485,11 +1476,10 @@
     }
   }
 
-  function celebrateMilestone(ms) {
+  function celebrateMilestone() {
     queueCelebration((done) => {
-    haptic(ms.vibrate);
+    haptic(MILESTONE_VIBRATE);
 
-    const tierIndex = MILESTONES.indexOf(ms);
     const phrase = getRandomPhrase();
     const overlay = document.createElement('div');
     overlay.className = 'celebrate-overlay';
@@ -1497,86 +1487,45 @@
     // Banner
     const banner = document.createElement('div');
     banner.className = 'celebrate-banner';
-    if (tierIndex >= 4) banner.classList.add('banner-glow');
-    if (tierIndex >= 5) banner.classList.add('banner-gold');
     banner.textContent = `${phrase.label} ${phrase.emoji}`;
     overlay.appendChild(banner);
 
-    // Particles — scale up with tier
+    // Particles — starburst + confetti mix
     const starEmojis = ['⭐', '💪', '🔥', '⚡', '🌟', '🏆', '🚀', '🎉', '✨', '💥'];
     const colors = ['#4ade80', '#6c63ff', '#fbbf24', '#ff6b81', '#63b3ff', '#ce82ff', '#ff9f43', '#2ed573'];
+    const burstCount = Math.floor(MILESTONE_PARTICLES * 0.6);
+    const confettiCount = MILESTONE_PARTICLES - burstCount;
 
-    if (tierIndex <= 1) {
-      // Small: sparks popping up from bottom center
-      for (let i = 0; i < ms.particles; i++) {
-        const p = document.createElement('div');
-        p.className = 'spark';
-        p.textContent = starEmojis[Math.floor(Math.random() * starEmojis.length)];
-        const spread = (Math.random() - 0.5) * 340;
-        const rise = 120 + Math.random() * 200;
-        p.style.setProperty('--sx', spread + 'px');
-        p.style.setProperty('--sy', -rise + 'px');
-        p.style.animationDelay = Math.random() * 0.6 + 's';
-        p.style.fontSize = (16 + Math.random() * 14) + 'px';
-        overlay.appendChild(p);
-      }
-    } else if (tierIndex <= 3) {
-      // Medium: starburst from center
-      for (let i = 0; i < ms.particles; i++) {
-        const p = document.createElement('div');
-        p.className = 'starburst';
-        p.textContent = starEmojis[Math.floor(Math.random() * starEmojis.length)];
-        const angle = (Math.PI * 2 * i) / ms.particles + (Math.random() - 0.5) * 0.5;
-        const dist = 120 + Math.random() * 260;
-        p.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
-        p.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
-        p.style.animationDelay = Math.random() * 0.8 + 's';
-        p.style.animationDuration = (1.8 + Math.random() * 1.5) + 's';
-        p.style.fontSize = (18 + Math.random() * 18) + 'px';
-        overlay.appendChild(p);
-      }
-      // Screen shake for Beast Mode
-      if (tierIndex === 3) {
-        document.getElementById('app').classList.add('screen-shake');
-        setTimeout(() => document.getElementById('app').classList.remove('screen-shake'), 500);
-      }
-    } else {
-      // Big: confetti rain + starburst combined
-      const confettiCount = Math.floor(ms.particles * 0.5);
-      const burstCount = ms.particles - confettiCount;
-      const shapes = ['●', '■', '▲', '★', '◆'];
-      for (let i = 0; i < confettiCount; i++) {
-        const p = document.createElement('div');
-        p.className = 'confetti';
-        p.textContent = shapes[Math.floor(Math.random() * shapes.length)];
-        p.style.color = colors[Math.floor(Math.random() * colors.length)];
-        p.style.left = Math.random() * 100 + '%';
-        p.style.animationDelay = Math.random() * 1.2 + 's';
-        p.style.animationDuration = (2.5 + Math.random() * 2.5) + 's';
-        p.style.fontSize = (14 + Math.random() * 22) + 'px';
-        overlay.appendChild(p);
-      }
-      for (let i = 0; i < burstCount; i++) {
-        const p = document.createElement('div');
-        p.className = 'starburst';
-        p.textContent = starEmojis[Math.floor(Math.random() * starEmojis.length)];
-        const angle = (Math.PI * 2 * i) / burstCount + (Math.random() - 0.5) * 0.4;
-        const dist = 160 + Math.random() * 280;
-        p.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
-        p.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
-        p.style.animationDelay = Math.random() * 0.8 + 's';
-        p.style.animationDuration = (1.8 + Math.random() * 1.5) + 's';
-        p.style.fontSize = (20 + Math.random() * 20) + 'px';
-        overlay.appendChild(p);
-      }
-      // Screen shake for top tiers
-      document.getElementById('app').classList.add('screen-shake');
-      setTimeout(() => document.getElementById('app').classList.remove('screen-shake'), 600);
+    for (let i = 0; i < burstCount; i++) {
+      const p = document.createElement('div');
+      p.className = 'starburst';
+      p.textContent = starEmojis[Math.floor(Math.random() * starEmojis.length)];
+      const angle = (Math.PI * 2 * i) / burstCount + (Math.random() - 0.5) * 0.5;
+      const dist = 120 + Math.random() * 280;
+      p.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
+      p.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
+      p.style.animationDelay = Math.random() * 0.8 + 's';
+      p.style.animationDuration = (1.8 + Math.random() * 1.5) + 's';
+      p.style.fontSize = (18 + Math.random() * 18) + 'px';
+      overlay.appendChild(p);
+    }
+
+    const shapes = ['●', '■', '★', '◆'];
+    for (let i = 0; i < confettiCount; i++) {
+      const p = document.createElement('div');
+      p.className = 'confetti';
+      p.textContent = shapes[Math.floor(Math.random() * shapes.length)];
+      p.style.color = colors[Math.floor(Math.random() * colors.length)];
+      p.style.left = Math.random() * 100 + '%';
+      p.style.animationDelay = Math.random() * 1.0 + 's';
+      p.style.animationDuration = (2.0 + Math.random() * 2.0) + 's';
+      p.style.fontSize = (14 + Math.random() * 20) + 'px';
+      overlay.appendChild(p);
     }
 
     document.getElementById('app').appendChild(overlay);
 
-    scheduleCelebrationEnd(overlay, done, ms.duration);
+    scheduleCelebrationEnd(overlay, done, MILESTONE_DURATION);
     });
   }
 

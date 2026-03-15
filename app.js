@@ -140,7 +140,7 @@
       target: 15,
       exercises: [
         { id: 'chest_press', name: 'Chest Press', icon: '🎽', dots: 4 },
-        { id: 'flys', name: 'Flys', icon: '�', dots: 4 },
+        { id: 'flys', name: 'Flys', icon: '🦋', dots: 4 },
       ],
     },
     legs: {
@@ -645,6 +645,8 @@
         container.appendChild(wrapper);
       }
     }
+
+    container.classList.toggle('has-expanded', expandedGroups.size > 0);
   }
 
   function buildStepperRow(groupKey, target) {
@@ -1414,6 +1416,7 @@
     row.classList.add('active');
     const chevron = row.querySelector('.summary-chevron');
     if (chevron) chevron.classList.add('open');
+    container.classList.add('has-expanded');
 
     // Build stepper + exercises inside a single wrapper (one flex item = one gap)
     const wrapper = document.createElement('div');
@@ -1442,24 +1445,31 @@
     const cards = Array.from(exContainer.querySelectorAll('.exercise-card'));
     cards.forEach(card => {
       card.style.opacity = '0';
-      card.style.transform = 'translateY(-8px)';
+      card.style.transform = 'translate3d(0, -8px, 0)';
+      card.style.willChange = 'opacity, transform';
+      card.style.backfaceVisibility = 'hidden';
     });
 
     cards.forEach((card, i) => {
       setTimeout(() => {
         card.style.transition = 'opacity 0.25s ease, transform 0.3s ease-out';
         card.style.opacity = '1';
-        card.style.transform = 'translateY(0)';
+        card.style.transform = 'translate3d(0, 0, 0)';
       }, i * 60 + 80);
     });
 
     const totalTime = cards.length * 60 + 80 + 350;
 
-    // Unlock wrapper height after it finishes expanding
+    // Unlock wrapper height and clean up GPU hints after animation
     setTimeout(() => {
       wrapper.style.height = '';
       wrapper.style.overflow = '';
       wrapper.style.transition = '';
+      cards.forEach(card => {
+        card.style.willChange = '';
+        card.style.backfaceVisibility = '';
+        card.style.transform = '';
+      });
     }, totalTime);
 
     setTimeout(() => {
@@ -1482,6 +1492,7 @@
       const chevron = row.querySelector('.summary-chevron');
       if (chevron) chevron.classList.remove('open');
     }
+    if (expandedGroups.size === 0) container.classList.remove('has-expanded');
 
     if (!wrapper) {
       animatingGroups.delete(groupKey);
@@ -1490,15 +1501,31 @@
 
     // Stagger card opacity+transform out (bottom to top) — GPU composited
     const cards = Array.from(wrapper.querySelectorAll('.exercise-card'));
+    const stepper = wrapper.querySelector('.target-stepper-row');
     const last = cards.length - 1;
     const cardAnimTime = last * 60 + 320;
+
+    // Promote cards to own GPU layers before animating
+    cards.forEach(card => {
+      card.style.willChange = 'opacity, transform';
+      card.style.backfaceVisibility = 'hidden';
+    });
+
+    // Force layout so will-change layers are created before transition starts
+    void wrapper.offsetHeight;
 
     cards.forEach((card, i) => {
       const delay = (last - i) * 60;
       card.style.transition = `opacity 0.2s ease ${delay}ms, transform 0.25s ease ${delay}ms`;
       card.style.opacity = '0';
-      card.style.transform = 'translateY(-8px)';
+      card.style.transform = 'translate3d(0, -8px, 0)';
     });
+
+    // Fade stepper row in sync with the last card
+    if (stepper) {
+      stepper.style.transition = `opacity 0.2s ease ${cardAnimTime - 200}ms`;
+      stepper.style.opacity = '0';
+    }
 
     // Lock wrapper height, then collapse smoothly after cards fade
     const wrapperH = wrapper.offsetHeight;
@@ -1507,9 +1534,12 @@
 
     const collapseDelay = Math.min(cardAnimTime * 0.6, 250);
 
+    // Double rAF ensures the browser has painted the locked height before transitioning
     requestAnimationFrame(() => {
-      wrapper.style.transition = `height ${((cardAnimTime - collapseDelay + 100) / 1000).toFixed(2)}s cubic-bezier(0.4, 0, 0.2, 1) ${collapseDelay}ms`;
-      wrapper.style.height = '0';
+      requestAnimationFrame(() => {
+        wrapper.style.transition = `height ${((cardAnimTime - collapseDelay + 100) / 1000).toFixed(2)}s cubic-bezier(0.4, 0, 0.2, 1) ${collapseDelay}ms`;
+        wrapper.style.height = '0';
+      });
     });
 
     // Clean up DOM after wrapper reaches 0

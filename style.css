@@ -123,13 +123,13 @@ body {
 /* ===== Group Exercises (accordion) ===== */
 .group-expanded-wrapper {
   overflow: hidden;
+  will-change: height;
 }
 
 .group-exercises {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  will-change: height;
 }
 
 .card h2 {
@@ -176,6 +176,10 @@ body {
   overflow: hidden;
   flex-shrink: 0;
   will-change: opacity, max-height, transform;
+}
+
+#summary-bars.has-expanded .summary-row:not(.active) {
+  opacity: 0.4;
 }
 
 .summary-row.faded {
@@ -817,9 +821,10 @@ body {
 
 .card-action-item {
   flex: 1;
-  padding: 14px 6px;
+  min-height: 52px;
+  padding: 16px 8px;
   border: 2px solid var(--surface2);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--bg);
   color: var(--text-dim);
   opacity: 0;
@@ -836,7 +841,7 @@ body {
   from { opacity: 0; transform: translateY(-10px) scale(0.9); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
   text-align: center;

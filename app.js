@@ -730,7 +730,23 @@
 
       // Tap on card header to toggle expand/collapse
       card.querySelector('.card-inner').addEventListener('click', () => {
-        expandedExercise = expandedExercise === ex.id ? null : ex.id;
+        if (expandedExercise === ex.id) {
+          // Collapsing — animate buttons out first
+          const actions = card.querySelector('.card-actions');
+          if (actions) {
+            actions.classList.add('collapsing');
+            setTimeout(() => {
+              expandedExercise = null;
+              skipAnimation = true;
+              renderExercises();
+              skipAnimation = false;
+            }, 280);
+            return;
+          }
+          expandedExercise = null;
+        } else {
+          expandedExercise = ex.id;
+        }
         skipAnimation = true;
         renderExercises();
         skipAnimation = false;
@@ -740,12 +756,14 @@
       if (isExpanded) {
         card.querySelector('.card-action-add').addEventListener('click', (e) => {
           e.stopPropagation();
+          popBtn(e.currentTarget);
           skipActionAnim = true;
           logExercise(ex.id);
           skipActionAnim = false;
         });
         card.querySelector('.card-action-heavy').addEventListener('click', (e) => {
           e.stopPropagation();
+          popBtn(e.currentTarget);
           skipActionAnim = true;
           logExercise(ex.id);
           // Immediately mark as push
@@ -763,12 +781,14 @@
         });
         card.querySelector('.card-action-remove').addEventListener('click', (e) => {
           e.stopPropagation();
+          popBtn(e.currentTarget);
           skipActionAnim = true;
           removeLastTodaySet(ex.id);
           skipActionAnim = false;
         });
         card.querySelector('.card-action-options').addEventListener('click', (e) => {
           e.stopPropagation();
+          popBtn(e.currentTarget);
           showExerciseOptions(ex.id, activeGroup);
         });
       }
@@ -796,75 +816,15 @@
     animateCardIn(addCard, activeGroup, idx);
   }
 
-  // Per-group card entrance animations — each group has a unique style
-  const GROUP_ANIMATIONS = {
-    back: (card, i) => {
-      // Cascade down
-      card.style.opacity = '0';
-      card.style.transform = 'translateY(-30px)';
-      setTimeout(() => {
-        card.style.transition = 'opacity 0.35s ease, transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)';
-        card.style.opacity = '1';
-        card.style.transform = 'translateY(0)';
-      }, i * 60);
-    },
-    shoulders: (card, i) => {
-      // Fan out from center
-      const dir = i % 2 === 0 ? -1 : 1;
-      card.style.opacity = '0';
-      card.style.transform = `translateX(${dir * 60}px) rotate(${dir * 8}deg)`;
-      setTimeout(() => {
-        card.style.transition = 'opacity 0.4s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
-        card.style.opacity = '1';
-        card.style.transform = 'translateX(0) rotate(0deg)';
-      }, i * 70);
-    },
-    chest: (card, i) => {
-      // Scale up with bounce
-      card.style.opacity = '0';
-      card.style.transform = 'scale(0.3)';
-      setTimeout(() => {
-        card.style.transition = 'opacity 0.4s ease, transform 0.5s cubic-bezier(0.34, 1.8, 0.64, 1)';
-        card.style.opacity = '1';
-        card.style.transform = 'scale(1)';
-      }, i * 80);
-    },
-    legs: (card, i) => {
-      // Slide up from bottom
-      card.style.opacity = '0';
-      card.style.transform = 'translateY(80px)';
-      setTimeout(() => {
-        card.style.transition = 'opacity 0.35s ease, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1)';
-        card.style.opacity = '1';
-        card.style.transform = 'translateY(0)';
-      }, i * 55);
-    },
-    arms: (card, i) => {
-      // Flip in from side
-      card.style.opacity = '0';
-      card.style.transform = 'perspective(600px) rotateY(90deg)';
-      setTimeout(() => {
-        card.style.transition = 'opacity 0.4s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1)';
-        card.style.opacity = '1';
-        card.style.transform = 'perspective(600px) rotateY(0deg)';
-      }, i * 75);
-    },
-    cardio: (card, i) => {
-      // Elastic drop from above
-      card.style.opacity = '0';
-      card.style.transform = 'translateY(-100px) scaleY(0.4)';
-      setTimeout(() => {
-        card.style.transition = 'opacity 0.3s ease, transform 0.6s cubic-bezier(0.22, 1.5, 0.36, 1)';
-        card.style.opacity = '1';
-        card.style.transform = 'translateY(0) scaleY(1)';
-      }, i * 100);
-    },
-  };
-
   function animateCardIn(card, groupKey, index) {
     if (skipAnimation) return;
-    const anim = GROUP_ANIMATIONS[groupKey];
-    if (anim) anim(card, index);
+    card.style.opacity = '0';
+    card.style.transform = 'translateY(80px)';
+    setTimeout(() => {
+      card.style.transition = 'opacity 0.35s ease, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1)';
+      card.style.opacity = '1';
+      card.style.transform = 'translateY(0)';
+    }, index * 55);
   }
 
   // ===== Exercise Options Menu =====
@@ -1233,6 +1193,12 @@
     celebrateMilestone(milestone);
   }
 
+  function popBtn(btn) {
+    btn.classList.remove('btn-pop');
+    void btn.offsetWidth;
+    btn.classList.add('btn-pop');
+  }
+
   function haptic(pattern) {
     if (navigator.vibrate) {
       navigator.vibrate(pattern);
@@ -1462,31 +1428,23 @@
       activeGroup = groupKey;
       renderExercises();
       renderSummary();
-
-      // Pulse the active row in
-      const activeRow = container.querySelector('.summary-row.active');
-      if (activeRow) {
-        activeRow.style.opacity = '0';
-        activeRow.style.transform = 'scale(0.95)';
-        activeRow.style.transition = 'none';
-        requestAnimationFrame(() => {
-          activeRow.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-          activeRow.style.opacity = '1';
-          activeRow.style.transform = 'scale(1)';
-        });
-      }
     }, 280);
   }
 
   function collapseExercises() {
     const container = document.getElementById('exercises');
-    const cards = container.querySelectorAll('.exercise-card');
+    const cards = Array.from(container.querySelectorAll('.exercise-card'));
+    const last = cards.length - 1;
     cards.forEach((card, i) => {
-      card.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
-      card.style.opacity = '0';
-      card.style.transform = 'scale(0.9)';
+      const delay = (last - i) * 55;
+      card.style.transition = 'none';
+      requestAnimationFrame(() => {
+        card.style.transition = `opacity 0.35s ease ${delay}ms, transform 0.45s cubic-bezier(0.55, 0, 0.78, 0) ${delay}ms`;
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(80px)';
+      });
     });
-    setTimeout(() => { container.innerHTML = ''; }, 250);
+    setTimeout(() => { container.innerHTML = ''; }, (last * 55) + 450);
   }
 
   // ===== Init =====

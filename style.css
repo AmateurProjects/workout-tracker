@@ -836,10 +836,34 @@ body {
   transform: scale(0.93);
 }
 
+.card-action-item.btn-pop {
+  animation: btnPop 0.35s ease;
+}
+
+@keyframes btnPop {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(0.82); }
+  60%  { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
 .card-actions.no-animate .card-action-item {
   opacity: 1;
   transform: none;
   animation: none;
+}
+
+.card-actions.collapsing .card-action-item {
+  animation: actionBtnOut 0.22s ease forwards;
+}
+.card-actions.collapsing .card-action-item:nth-child(4) { animation-delay: 0s; }
+.card-actions.collapsing .card-action-item:nth-child(3) { animation-delay: 0.04s; }
+.card-actions.collapsing .card-action-item:nth-child(2) { animation-delay: 0.08s; }
+.card-actions.collapsing .card-action-item:nth-child(1) { animation-delay: 0.12s; }
+
+@keyframes actionBtnOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(-10px) scale(0.9); }
 }
 
 .card-action-add {
